@@ -1,0 +1,17 @@
+schema_version = 1
+
+[zerodep]
+repo = "https://github.com/Oaklight/zerodep.git"
+tag = "v2026.11.20"
+commit = "9f872e8d652272c34600b9fda6448fe4fd4436c3"
+requires_python = ">=3.10"
+notes = "Pinned for compatibility tests. Do not edit the zerodep source tree."
+
+[versions."3.14"]
+enabled = true
+version = "3.14.9"
+tag = "v3.14.9"
+url = "https://www.python.org/ftp/python/3.14.9/Python-3.14.9.tar.xz"
+sha256 = "e02d9ac21cebda6e46435369744a92c65cc7cd8669697694122cf97ffacd1e53"
+git_commit = "ead82c07db1f111d613926ed1b6667411d768125"
+source_dir = "sources/cpython-3.14.9"

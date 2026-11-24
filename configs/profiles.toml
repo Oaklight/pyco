@@ -1,0 +1,56 @@
+schema_version = 1
+
+[profiles.baseline]
+description = "Upstream default optimization with shared libpython"
+cc = "gcc"
+cxx = "g++"
+configure = ["--enable-shared", "--with-ensurepip=install"]
+cflags = ""
+cppflags = ""
+cxxflags = ""
+ldflags = ""
+experimental = false
+
+[profiles.size]
+description = "Size-oriented code generation with shared libpython"
+cc = "gcc"
+cxx = "g++"
+configure = ["--enable-shared", "--with-ensurepip=install"]
+cflags = "-Os"
+cppflags = ""
+cxxflags = ""
+ldflags = ""
+experimental = false
+
+[profiles.lto]
+description = "Size optimization plus link-time optimization"
+cc = "gcc"
+cxx = "g++"
+configure = ["--enable-shared", "--with-ensurepip=install", "--with-lto"]
+cflags = "-Os"
+cppflags = ""
+cxxflags = ""
+ldflags = ""
+experimental = false
+
+[profiles.static]
+description = "Static libpython linkage into the executable"
+cc = "gcc"
+cxx = "g++"
+configure = ["--disable-shared", "--with-ensurepip=install"]
+cflags = "-Os"
+cppflags = ""
+cxxflags = ""
+ldflags = ""
+experimental = false
+
+[profiles."clang-oz"]
+description = "Aggressive size-oriented code generation with Clang"
+cc = "clang"
+cxx = "clang++"
+configure = ["--enable-shared", "--with-ensurepip=install"]
+cflags = "-Oz"
+cppflags = ""
+cxxflags = ""
+ldflags = ""
+experimental = true

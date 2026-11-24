@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyco-build"
+dynamic = ["version"]
+description = "Build and measure compact, full-compatibility CPython distributions"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "tomli>=2.0; python_version < '3.11'",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Build Tools",
+]
+
+[project.scripts]
+pyco = "pyco_build.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Oaklight/pyco"
+Issues = "https://github.com/Oaklight/pyco/issues"
+
+[tool.setuptools]
+packages = ["pyco_build"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pyco_build.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

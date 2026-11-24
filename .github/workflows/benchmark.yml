@@ -1,0 +1,94 @@
+name: benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Build profile
+        type: choice
+        options: [baseline, size, lto, static, clang-oz]
+        default: baseline
+      runs:
+        description: Measurement repetitions
+        type: string
+        default: "20"
+      full:
+        description: Run the full CPython regression suite
+        type: boolean
+        default: true
+      network:
+        description: Allow network-dependent zerodep tests
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYCO_VERSION: "3.14"
+  PYCO_TARGET: "linux-x86_64"
+
+jobs:
+  benchmark:
+    name: Benchmark ${{ inputs.profile }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: base
+          auto-activate-base: true
+      - name: Cache verified CPython sources
+        uses: actions/cache@v4
+        with:
+          path: sources/
+          key: pyco-sources-${{ hashFiles('configs/versions.toml') }}
+      - name: Create locked conda environment
+        shell: bash -el {0}
+        env:
+          PYCO_CONDA_PREFIX: ${{ runner.temp }}/pyco-env
+        run: |
+          conda create --yes --prefix "$PYCO_CONDA_PREFIX" \
+            --file conda-linux-64.lock \
+            --override-channels -c conda-forge
+      - name: Full build and measurement
+        shell: bash -el {0}
+        env:
+          PYCO_CONDA_PREFIX: ${{ runner.temp }}/pyco-env
+          PROFILE: ${{ inputs.profile }}
+          RUNS: ${{ inputs.runs }}
+          FULL: ${{ inputs.full }}
+          NETWORK: ${{ inputs.network }}
+        run: |
+          export PATH="$PYCO_CONDA_PREFIX/bin:$PATH"
+          export PYTHONPATH="$PWD"
+          python --version
+          mode=--smoke
+          network=
+          if [[ "$FULL" == "true" ]]; then mode=--full; fi
+          if [[ "$NETWORK" == "true" ]]; then network=--network; fi
+          ./scripts/fetch.sh "$PYCO_VERSION" --zerodep
+          ./scripts/build.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --jobs "$(nproc)"
+          ./scripts/test.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" "$mode" $network --jobs "$(nproc)"
+          ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs "$RUNS"
+          ./scripts/package.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET"
+          ./scripts/report.sh
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyco-benchmark-${{ inputs.profile }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            results/**/*.json
+            results/summary.csv
+            results/report.md
+            dist/*.tar.gz

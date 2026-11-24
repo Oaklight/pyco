@@ -1,0 +1,23 @@
+# Generated build trees
+/build/
+/dist/
+/out/
+/sources/
+/work/
+/.conda-env/
+*.egg-info/
+
+# Python caches and local test state
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Measurements and logs; keep the generated aggregate report tracked.
+/results/*
+!/results/summary.csv
+!/results/report.md
+
+# OS files
+.DS_Store

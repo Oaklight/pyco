@@ -1,0 +1,15 @@
+.git
+.github
+.conda-env
+.venv
+build
+dist
+out
+sources
+work
+results
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.ruff_cache

@@ -1,0 +1,121 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYCO_VERSION: "3.14"
+  PYCO_TARGET: "linux-x86_64"
+
+jobs:
+  unit:
+    name: Unit checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Compile Python sources
+        run: python -m compileall -q pyco_build tests benchmarks
+      - name: Show configured matrix
+        run: python -m pyco_build.cli list
+      - name: Verify dry-run environment
+        run: python -m pyco_build.cli build 3.14 size linux-x86_64 --dry-run
+
+  build:
+    name: Build ${{ matrix.profile }}
+    needs: unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [baseline, size, lto, static, clang-oz]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: base
+          auto-activate-base: true
+      - name: Cache verified CPython sources
+        uses: actions/cache@v4
+        with:
+          path: sources/
+          key: pyco-sources-${{ hashFiles('configs/versions.toml') }}
+      - name: Create locked conda environment
+        shell: bash -el {0}
+        env:
+          PYCO_CONDA_PREFIX: ${{ runner.temp }}/pyco-env
+        run: |
+          conda create --yes --prefix "$PYCO_CONDA_PREFIX" \
+            --file conda-linux-64.lock \
+            --override-channels -c conda-forge
+      - name: Build, test, measure, and package
+        shell: bash -el {0}
+        env:
+          PYCO_CONDA_PREFIX: ${{ runner.temp }}/pyco-env
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          export PATH="$PYCO_CONDA_PREFIX/bin:$PATH"
+          export PYTHONPATH="$PWD"
+          python --version
+          ./scripts/fetch.sh "$PYCO_VERSION" --zerodep
+          ./scripts/build.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --jobs "$(nproc)"
+          ./scripts/test.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --smoke
+          ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs 5
+          ./scripts/package.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET"
+      - name: Upload profile results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyco-${{ matrix.profile }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            results/**/*.json
+            dist/*.tar.gz
+
+  aggregate:
+    name: Aggregate report
+    needs: build
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download profile results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pyco-*
+          merge-multiple: true
+          path: .
+      - name: Generate report
+        run: python -m pyco_build.cli report
+      - name: Show report
+        run: cat results/report.md
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyco-report
+          path: |
+            results/summary.csv
+            results/report.md

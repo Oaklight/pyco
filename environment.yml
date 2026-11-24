@@ -1,0 +1,46 @@
+name: pyco
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - gcc_linux-64>=13
+  - gxx_linux-64>=13
+  - binutils_linux-64
+  - sysroot_linux-64
+  - clang>=18
+  - clangxx>=18
+  - lld
+  - llvm-tools
+  - make
+  - patch
+  - patchelf
+  - pkg-config
+  - git
+  - rsync
+  - file
+  - tar
+  - gzip
+  - xz
+  - bzip2
+  - zlib
+  - openssl
+  - sqlite
+  - readline
+  - ncurses
+  - tk
+  - libffi
+  - gdbm
+  - db
+  - libuuid
+  - expat
+  - zstd
+  - libmpdec
+  - hyperfine
+  - time
+  - shellcheck
+  - go-shfmt
+  - pytest
+  - pytest-asyncio
+  - pytest-benchmark
