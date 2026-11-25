@@ -123,6 +123,10 @@ Native extensions link conda-forge libraries such as OpenSSL, SQLite, and
 with the toolchain `lib` directory on `LD_LIBRARY_PATH`, or bundle the required
 libraries before redistribution.
 
+Known toolchain gap: `_dbm` is not built because the conda-forge `gdbm` and `db`
+packages do not provide the ndbm compatibility header and symbol set. `_gdbm`
+is built. This gap must be closed before a full-compatibility release.
+
 ## Layout
 
 ```text

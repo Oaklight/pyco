@@ -30,6 +30,8 @@ dependencies:
   - readline
   - ncurses
   - tk
+  - xorg-libx11
+  - xorg-xproto
   - libffi
   - gdbm
   - db
