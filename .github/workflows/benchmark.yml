@@ -58,6 +58,11 @@ jobs:
           conda create --yes --prefix "$PYCO_CONDA_PREFIX" \
             --file conda-linux-64.lock \
             --override-channels -c conda-forge
+      - name: Install gdbm ndbm compatibility
+        shell: bash -el {0}
+        env:
+          PYCO_CONDA_PREFIX: ${{ runner.temp }}/pyco-env
+        run: ./scripts/install-gdbm-compat.sh "$PYCO_CONDA_PREFIX"
       - name: Full build and measurement
         shell: bash -el {0}
         env:
