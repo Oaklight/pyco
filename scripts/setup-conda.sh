@@ -78,6 +78,7 @@ else
 	create_from_environment_yml
 fi
 
+"${ROOT_DIR}/scripts/install-gdbm-compat.sh" "${PREFIX}"
 "${ROOT_DIR}/scripts/conda-aliases.sh" "${PREFIX}"
 echo "conda environment ready: ${PREFIX}"
 echo "activate with: source \"$("${CONDA_BIN}" info --base)/etc/profile.d/conda.sh\" && conda activate \"${PREFIX}\""

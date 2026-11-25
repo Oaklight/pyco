@@ -156,6 +156,20 @@ def check_filesystem() -> None:
             raise RuntimeError("os.replace failed")
 
 
+def check_dbm() -> None:
+    """Exercise the ndbm-backed dbm module."""
+
+    import dbm.ndbm
+
+    with tempfile.TemporaryDirectory(prefix="pyco-dbm-") as directory:
+        path = Path(directory) / "records"
+        with dbm.ndbm.open(str(path), "c") as database:
+            database[b"key"] = b"value"
+        with dbm.ndbm.open(str(path), "r") as database:
+            if database[b"key"] != b"value":
+                raise RuntimeError("dbm round trip failed")
+
+
 CHECKS = (
     ("imports", check_imports),
     ("sqlite", check_sqlite),
@@ -165,6 +179,7 @@ CHECKS = (
     ("asyncio", check_asyncio),
     ("ssl", check_ssl),
     ("filesystem", check_filesystem),
+    ("dbm", check_dbm),
 )
 
 
