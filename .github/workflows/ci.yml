@@ -80,6 +80,14 @@ jobs:
           ./scripts/test.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --smoke
           ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs 5
           ./scripts/package.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET"
+      - name: Show failure logs
+        if: failure()
+        shell: bash
+        run: |
+          while IFS= read -r -d '' log_file; do
+            echo "===== ${log_file}"
+            tail -80 "${log_file}"
+          done < <(find results -type f -path '*/logs/*.log' -print0)
       - name: Upload profile results
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,6 +97,7 @@ jobs:
           retention-days: 14
           path: |
             results/**/*.json
+            results/**/logs/*.log
             dist/*.tar.gz
 
   aggregate:

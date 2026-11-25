@@ -343,10 +343,15 @@ def build(
             raise BuildError(f"build failed; see {built.log_path}")
 
         log(f"installing into {paths.prefix}")
+        install_env = python_runtime_env(paths.prefix)
+        existing_library_path = install_env.get("LD_LIBRARY_PATH", "")
+        install_env["LD_LIBRARY_PATH"] = str(paths.build_dir) + (
+            f":{existing_library_path}" if existing_library_path else ""
+        )
         installed_result = run_command(
             install_cmd,
             cwd=paths.build_dir,
-            env=env,
+            env=install_env,
             log_path=paths.logs_dir / "install.log",
             check=False,
         )
