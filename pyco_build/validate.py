@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -56,6 +57,33 @@ class ValidationResult:
 
 def _slug(name: str) -> str:
     return name.replace("/", "-").replace(" ", "-").lower()
+
+
+# CPython's multiprocessing falls back to /tmp when the socket paths below
+# TMPDIR could exceed sun_path, and one regression test assumes that fallback
+# does not happen. Keep the full-suite TMPDIR short instead of nesting it under
+# the results directory, whose path is long on CI runners.
+_SUN_PATH_MAX = 108
+_MULTIPROCESSING_SOCKET_BUDGET = 28  # "/pymp-XXXXXXXX/sock-XXXXXXXX"
+_REGRTEST_TMPDIR_BUDGET = 40  # "/test_python_XXXXXXXX/tmpXXXXXXXX/TMPDIR"
+
+
+def _regression_temp_dir() -> Path:
+    """Create a short TMPDIR for the full CPython regression suite."""
+
+    tmp_dir = Path(tempfile.mkdtemp(prefix="pyco-tests-", dir="/tmp"))
+    path_length = (
+        len(str(tmp_dir)) + _REGRTEST_TMPDIR_BUDGET + _MULTIPROCESSING_SOCKET_BUDGET
+    )
+    if path_length >= _SUN_PATH_MAX:
+        remove_tree(tmp_dir)
+        limit = (
+            _SUN_PATH_MAX - _REGRTEST_TMPDIR_BUDGET - _MULTIPROCESSING_SOCKET_BUDGET - 1
+        )
+        raise ValidationError(
+            f"regression TMPDIR is too long: {tmp_dir}; limit is {limit} characters"
+        )
+    return tmp_dir
 
 
 def _append_jsonl(path: Path, data: dict[str, Any]) -> None:
@@ -365,7 +393,6 @@ def validate(
     remove_tree(tests_root)
     tests_root.mkdir(parents=True)
     (tests_root / "logs").mkdir()
-    (tests_root / "tmp").mkdir()
 
     started_at = utc_now()
     started = time.monotonic()
@@ -448,28 +475,31 @@ def validate(
         _check_zerodep(spec, config, paths.prefix, tests_root, gates, network=network)
 
     if mode == "full":
-        tmp_dir = tests_root / "tmp"
-        env = python_runtime_env(paths.prefix)
-        env["TMPDIR"] = str(tmp_dir)
-        _run_gate(
-            spec,
-            paths.prefix,
-            tests_root,
-            gates,
-            "cpython regression",
-            "full",
-            [
-                str(python),
-                "-m",
-                "test",
-                f"-j{jobs or os.cpu_count() or 1}",
-                "--timeout",
-                "1200",
-            ],
-            cwd=tests_root,
-            env=env,
-            timeout=7200,
-        )
+        tmp_dir = _regression_temp_dir()
+        try:
+            env = python_runtime_env(paths.prefix)
+            env["TMPDIR"] = str(tmp_dir)
+            _run_gate(
+                spec,
+                paths.prefix,
+                tests_root,
+                gates,
+                "cpython regression",
+                "full",
+                [
+                    str(python),
+                    "-m",
+                    "test",
+                    f"-j{jobs or os.cpu_count() or 1}",
+                    "--timeout",
+                    "1200",
+                ],
+                cwd=tests_root,
+                env=env,
+                timeout=7200,
+            )
+        finally:
+            remove_tree(tmp_dir)
     else:
         _skip_gate(
             tests_root,

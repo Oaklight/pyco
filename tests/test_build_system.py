@@ -6,6 +6,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import shutil
 import sys
 import tarfile
 import tempfile
@@ -21,6 +22,12 @@ from pyco_build.metrics import _parse_hyperfine  # noqa: E402
 from pyco_build.paths import BuildPaths  # noqa: E402
 from pyco_build.report import _row, _write_report  # noqa: E402
 from pyco_build.source import SourceError, _safe_extract  # noqa: E402
+from pyco_build.validate import (  # noqa: E402
+    _MULTIPROCESSING_SOCKET_BUDGET,
+    _REGRTEST_TMPDIR_BUDGET,
+    _SUN_PATH_MAX,
+    _regression_temp_dir,
+)
 from pyco_build.util import (  # noqa: E402
     duplicate_safe_size,
     is_elf,
@@ -314,6 +321,19 @@ class ReportTests(unittest.TestCase):
         )
         self.assertEqual(
             row["failure_reasons"], "full CPython suite not run; network disabled"
+        )
+
+
+class RegressionTempDirTests(unittest.TestCase):
+    def test_tmpdir_stays_below_sun_path_limit(self) -> None:
+        path = _regression_temp_dir()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        self.assertTrue(path.is_dir())
+        self.assertEqual(path.parent, Path("/tmp"))
+        self.assertLessEqual(len(str(path)), 39)
+        self.assertLess(
+            len(str(path)) + _REGRTEST_TMPDIR_BUDGET + _MULTIPROCESSING_SOCKET_BUDGET,
+            _SUN_PATH_MAX,
         )
 
 
