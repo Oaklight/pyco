@@ -30,6 +30,7 @@ class PackageError(PycoError):
     """Raised when packaging or extraction validation fails."""
 
 
+_ET_REL = 1
 _ET_EXEC = 2
 _ET_DYN = 3
 
@@ -48,6 +49,14 @@ def _elf_type(path: Path) -> int | None:
     return int.from_bytes(header[16:18], byteorder)
 
 
+def _is_archive(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(8) == b"!<arch>\n"
+    except OSError:
+        return False
+
+
 def _tree_bytes(root: Path) -> int:
     return sum(
         path.stat().st_size
@@ -64,23 +73,35 @@ def _strip_tree(root: Path) -> dict[str, Any]:
         raise PackageError("strip was not found on PATH")
     before = 0
     after = 0
-    count = 0
+    binaries = 0
+    objects = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(dirnames)
         for name in sorted(filenames):
             path = Path(dirpath) / name
-            if path.is_symlink() or _elf_type(path) not in {_ET_EXEC, _ET_DYN}:
+            if path.is_symlink():
+                continue
+            kind = _elf_type(path)
+            if kind in {_ET_EXEC, _ET_DYN}:
+                options = ["--strip-unneeded"]
+                binaries += 1
+            elif kind == _ET_REL or _is_archive(path):
+                options = ["--strip-debug"]
+                objects += 1
+            else:
                 continue
             size_before = path.stat().st_size
-            run_command([strip, "--strip-unneeded", str(path)])
+            run_command([strip, *options, str(path)])
             size_after = path.stat().st_size
             before += size_before
             after += size_after
-            count += 1
+    count = binaries + objects
     if count == 0:
-        raise PackageError("no executable or shared ELF files found to strip")
+        raise PackageError("no ELF files or static archives found to strip")
     return {
         "files": count,
+        "binaries": binaries,
+        "objects_and_archives": objects,
         "bytes_before": before,
         "bytes_after": after,
         "bytes_saved": before - after,

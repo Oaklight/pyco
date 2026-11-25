@@ -48,11 +48,11 @@ conda activate "$HOME/ml_lab/envs/pyco"
 falls back to `environment.yml`, and it updates an existing prefix from
 `environment.yml`. Set `PYCO_CONDA_USE_LOCK=0` to force the YAML path.
 
-`scripts/package.sh` copies the install prefix to a staging tree, strips
-executable and shared ELF debug symbols there, and writes a deterministic
-`tar.xz` archive. The original `out/` prefix keeps its symbols for debugging.
-Run packaging before measurement so the report can record archive and stripped
-installation sizes.
+`scripts/package.sh` copies the install prefix to a staging tree, strips debug
+symbols from ELF binaries, relocatable objects, and static archives there, and
+writes a deterministic `tar.xz` archive. The original `out/` prefix keeps its
+symbols for debugging. Run packaging before measurement so the report can record
+archive and stripped installation sizes.
 
 To use the environment without activating it, which is how CI runs builds:
 
