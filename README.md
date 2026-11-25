@@ -39,14 +39,20 @@ conda activate "$HOME/ml_lab/envs/pyco"
 ./scripts/fetch.sh 3.14 --zerodep
 ./scripts/build.sh 3.14 baseline linux-x86_64
 ./scripts/test.sh 3.14 baseline linux-x86_64 --smoke
-./scripts/measure.sh 3.14 baseline linux-x86_64 --runs 10
 ./scripts/package.sh 3.14 baseline linux-x86_64
+./scripts/measure.sh 3.14 baseline linux-x86_64 --runs 10
 ./scripts/report.sh
 ```
 
 `scripts/setup-conda.sh` prefers `conda-linux-64.lock` for a new prefix. It
 falls back to `environment.yml`, and it updates an existing prefix from
 `environment.yml`. Set `PYCO_CONDA_USE_LOCK=0` to force the YAML path.
+
+`scripts/package.sh` copies the install prefix to a staging tree, strips
+executable and shared ELF debug symbols there, and writes a deterministic
+`tar.xz` archive. The original `out/` prefix keeps its symbols for debugging.
+Run packaging before measurement so the report can record archive and stripped
+installation sizes.
 
 To use the environment without activating it, which is how CI runs builds:
 
@@ -95,7 +101,7 @@ automatically.
 | `make test PROFILE=size` | Run smoke and ABI gates |
 | `make test-full PROFILE=size` | Run full CPython and zerodep gates |
 | `make measure PROFILE=size RUNS=20` | Collect size, startup, RSS, and workload data |
-| `make package PROFILE=size` | Create and smoke-test a deterministic archive |
+| `make package PROFILE=size` | Create a stripped, deterministic `tar.xz` and smoke-test it |
 | `make report` | Write `results/summary.csv` and `results/report.md` |
 | `make matrix` | Run all five profiles without stopping on unrelated failures |
 | `make clean` | Remove `work/`, `out/`, and `dist/` |
@@ -148,12 +154,12 @@ results/        metadata per cell; summary.csv and report.md are tracked
 `.github/workflows/ci.yml` runs the unit checks, then builds the five profiles
 as independent matrix jobs with `fail-fast: false`. Each job creates its conda
 environment from `conda-linux-64.lock`, runs fetch, build, smoke tests,
-measurement, and packaging, and uploads its JSON results and archive. An
+packaging, and measurement, and uploads its JSON results and archive. An
 aggregate job downloads all profile results and regenerates the report.
 
 `.github/workflows/benchmark.yml` is the manual full-regression and repeated
 measurement path. It runs the full CPython suite and zerodep tests with network
-access, then measures and packages one selected profile.
+access, then packages and measures one selected profile.
 
 No release workflow is enabled yet. Release selection requires human approval in
 `configs/release-selection.toml` after the compatibility and performance gates

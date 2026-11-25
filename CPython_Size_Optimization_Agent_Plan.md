@@ -132,7 +132,7 @@ work/<exact-tag>/<target>/<profile>/src/   # patched working source if needed
 work/<exact-tag>/<target>/<profile>/build/ # out-of-tree build
 out/<exact-tag>/<target>/<profile>/        # installed runtime
 results/<exact-tag>/<target>/<profile>/    # metrics and logs
-dist/pyco-<release>-cpython<version>-<target>-<profile>.tar.gz
+dist/pyco-<release>-cpython<version>-<target>-<profile>.tar.xz
 ```
 
 Use **absolute source paths** for configure, ensure `make` is run from the build directory, and ensure the installation prefix is unique. Run the newly built Python explicitly; never accidentally test `/usr/bin/python3`. Handle `LD_LIBRARY_PATH` or rpath correctly for `--enable-shared`, and verify execution after packaging/extraction in a clean location. Make scripts idempotent or fail with a clear error if a directory is dirty. Fail fast on missing tools and required native-extension dependencies.
@@ -243,17 +243,17 @@ jobs:
         run: ./scripts/build.sh '${{ matrix.python }}' '${{ matrix.profile }}' '${{ matrix.target }}'
       - name: Validate
         run: ./scripts/test.sh '${{ matrix.python }}' '${{ matrix.profile }}' '${{ matrix.target }}' --smoke
-      - name: Measure
-        run: ./scripts/measure.sh '${{ matrix.python }}' '${{ matrix.profile }}' '${{ matrix.target }}'
       - name: Package and test extraction
         run: ./scripts/package.sh '${{ matrix.python }}' '${{ matrix.profile }}' '${{ matrix.target }}'
+      - name: Measure
+        run: ./scripts/measure.sh '${{ matrix.python }}' '${{ matrix.profile }}' '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pyco-${{ matrix.python }}-${{ matrix.target }}-${{ matrix.profile }}
           path: |
             results/${{ matrix.python }}/**
-            dist/*.tar.gz
+            dist/*.tar.xz
           if-no-files-found: warn
 ```
 

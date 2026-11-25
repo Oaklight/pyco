@@ -94,5 +94,5 @@ class BuildPaths:
         return (
             self.root
             / "dist"
-            / f"pyco-{release}-cpython{self.version}-{self.target}-{self.profile}.tar.gz"
+            / f"pyco-{release}-cpython{self.version}-{self.target}-{self.profile}.tar.xz"
         )

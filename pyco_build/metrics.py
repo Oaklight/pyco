@@ -289,12 +289,25 @@ def _peak_rss(command: list[str], prefix: Path) -> tuple[int | None, str | None]
 
 def _package_info(paths: BuildPaths) -> dict[str, Any]:
     archive = paths.package_archive
+    metadata = (
+        read_json(paths.package_metadata) if paths.package_metadata.exists() else {}
+    )
     if not archive.exists():
-        return {"path": str(archive), "bytes": None, "sha256": None}
+        return {
+            "path": str(archive),
+            "bytes": None,
+            "sha256": None,
+            "installed_bytes": None,
+            "status": "not-run",
+            "archive_format": None,
+        }
     return {
         "path": str(archive),
         "bytes": archive.stat().st_size,
-        "sha256": sha256_file(archive),
+        "sha256": metadata.get("archive_sha256") or sha256_file(archive),
+        "installed_bytes": metadata.get("installed_bytes"),
+        "status": metadata.get("status", "not-run"),
+        "archive_format": metadata.get("archive_format"),
     }
 
 
@@ -448,9 +461,11 @@ def measure(
         "native_extensions_bytes": extensions_bytes,
         "native_extension_count": len(extension_files),
         "installed_total_bytes": installed_bytes,
+        "packaged_installed_bytes": package.get("installed_bytes"),
         "external_shared_libs": external,
         "external_shared_libs_bytes": external_bytes,
         "archive_bytes": package["bytes"],
+        "archive_format": package.get("archive_format"),
         "archive_sha256": package["sha256"],
         "startup_ms": startup,
         "startup_ms_median": startup_normal.get("median_ms"),
@@ -461,7 +476,7 @@ def measure(
         "cpython_tests": _test_gate_status(tests, "cpython regression"),
         "zerodep_tests": _test_gate_status(tests, "zerodep tests"),
         "abi_result": _test_gate_status(tests, "abi import"),
-        "package_smoke_result": "not-run",
+        "package_smoke_result": package.get("status", "not-run"),
         "extension_inventory_diff": None,
         "eligible": bool(tests.get("eligible")) if tests else False,
         "validation_status": tests.get("status") if tests else "not-run",
@@ -475,7 +490,7 @@ def measure(
         },
         "notes": [
             "Core bytes count the executable and shared libpython; symlinks and hardlinks count once.",
-            "Installed total includes stdlib, extensions, headers, and metadata under the prefix.",
+            "Installed total uses the stripped packaged tree when available; installed_prefix_bytes retains the unstripped prefix size.",
         ],
     }
     write_json(paths.metrics_metadata, metrics)

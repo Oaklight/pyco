@@ -71,7 +71,7 @@ jobs:
         env:
           PYCO_CONDA_PREFIX: ${{ runner.temp }}/pyco-env
         run: ./scripts/install-gdbm-compat.sh "$PYCO_CONDA_PREFIX"
-      - name: Build, test, measure, and package
+      - name: Build, test, package, and measure
         shell: bash -el {0}
         env:
           PYCO_CONDA_PREFIX: ${{ runner.temp }}/pyco-env
@@ -83,8 +83,8 @@ jobs:
           ./scripts/fetch.sh "$PYCO_VERSION" --zerodep
           ./scripts/build.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --jobs "$(nproc)"
           ./scripts/test.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --smoke
-          ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs 5
           ./scripts/package.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET"
+          ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs 5
       - name: Show failure logs
         if: failure()
         shell: bash
@@ -103,7 +103,7 @@ jobs:
           path: |
             results/**/*.json
             results/**/logs/*.log
-            dist/*.tar.gz
+            dist/*.tar.xz
 
   aggregate:
     name: Aggregate report

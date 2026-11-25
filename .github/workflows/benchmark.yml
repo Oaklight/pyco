@@ -83,8 +83,8 @@ jobs:
           ./scripts/fetch.sh "$PYCO_VERSION" --zerodep
           ./scripts/build.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --jobs "$(nproc)"
           ./scripts/test.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" "$mode" $network --jobs "$TEST_JOBS"
-          ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs "$RUNS"
           ./scripts/package.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET"
+          ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs "$RUNS"
           ./scripts/report.sh
       - name: Show failure logs
         if: failure()
@@ -106,4 +106,4 @@ jobs:
             results/**/logs/*.log
             results/summary.csv
             results/report.md
-            dist/*.tar.gz
+            dist/*.tar.xz

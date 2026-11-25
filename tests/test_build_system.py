@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 from pyco_build.build import _flag_tokens_applied, _flags_in_makefile  # noqa: E402
 from pyco_build.config import ConfigError, load_config  # noqa: E402
 from pyco_build.metrics import _parse_hyperfine  # noqa: E402
+from pyco_build.package import _build_archive, _elf_type  # noqa: E402
 from pyco_build.paths import BuildPaths  # noqa: E402
 from pyco_build.report import _row, _write_report  # noqa: E402
 from pyco_build.source import SourceError, _safe_extract  # noqa: E402
@@ -167,6 +168,10 @@ class PathTests(unittest.TestCase):
         self.assertNotEqual(baseline.prefix, size.prefix)
         self.assertNotEqual(baseline.results_dir, size.results_dir)
 
+    def test_package_archive_uses_xz(self) -> None:
+        baseline = BuildPaths(self.config.resolve("3.14", "baseline", "linux-x86_64"))
+        self.assertTrue(baseline.package_archive.name.endswith(".tar.xz"))
+
     def test_paths_are_distinct_for_each_target(self) -> None:
         self.config.targets["linux-arm64"] = type(
             next(iter(self.config.targets.values()))
@@ -184,6 +189,43 @@ class PathTests(unittest.TestCase):
         arm = BuildPaths(self.config.resolve("3.14", "baseline", "linux-arm64"))
         self.assertNotEqual(x86.work_root, arm.work_root)
         self.assertNotEqual(x86.prefix, arm.prefix)
+
+
+class PackageTests(unittest.TestCase):
+    def test_elf_type_recognizes_executables_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "payload"
+            header = bytearray(20)
+            header[:4] = b"\x7fELF"
+            header[4] = 2
+            header[5] = 1
+            header[16:18] = (2).to_bytes(2, "little")
+            path.write_bytes(header)
+            self.assertEqual(_elf_type(path), 2)
+            header[16:18] = (1).to_bytes(2, "little")
+            path.write_bytes(header)
+            self.assertEqual(_elf_type(path), 1)
+            path.write_bytes(b"not elf")
+            self.assertIsNone(_elf_type(path))
+
+    def test_xz_archive_is_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            prefix = root / "prefix"
+            prefix.mkdir()
+            (prefix / "payload.txt").write_text("pyco\n", encoding="utf-8")
+            (prefix / "empty").mkdir()
+            first = root / "first.tar.xz"
+            second = root / "second.tar.xz"
+            _build_archive(prefix, first, "pyco-root")
+            _build_archive(prefix, second, "pyco-root")
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+            with tarfile.open(first, "r:*") as archive:
+                names = archive.getnames()
+                self.assertIn("pyco-root/payload.txt", names)
+                member = archive.extractfile("pyco-root/payload.txt")
+                assert member is not None
+                self.assertEqual(member.read(), b"pyco\n")
 
 
 class AccountingTests(unittest.TestCase):
@@ -322,6 +364,22 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(
             row["failure_reasons"], "full CPython suite not run; network disabled"
         )
+
+    def test_packaged_size_and_archive_are_reported(self) -> None:
+        row = _row(
+            {
+                "profile": "baseline",
+                "installed_total_bytes": 100,
+                "packaged_installed_bytes": 80,
+                "archive_bytes": 50,
+                "archive_format": "xz",
+                "package_smoke_result": "pass",
+            }
+        )
+        self.assertEqual(row["installed_total_bytes"], 80)
+        self.assertEqual(row["installed_prefix_bytes"], 100)
+        self.assertEqual(row["archive_bytes"], 50)
+        self.assertEqual(row["package_smoke_result"], "pass")
 
 
 class RegressionTempDirTests(unittest.TestCase):

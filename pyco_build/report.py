@@ -27,6 +27,7 @@ CSV_FIELDS = [
     "stdlib_source_data_bytes",
     "native_extensions_bytes",
     "installed_total_bytes",
+    "installed_prefix_bytes",
     "external_shared_libs",
     "archive_bytes",
     "startup_ms_median",
@@ -78,7 +79,12 @@ def _row(metrics: dict[str, Any]) -> dict[str, Any]:
         "core_stripped_bytes": metrics.get("core_stripped_bytes"),
         "stdlib_source_data_bytes": metrics.get("stdlib_source_data_bytes"),
         "native_extensions_bytes": metrics.get("native_extensions_bytes"),
-        "installed_total_bytes": metrics.get("installed_total_bytes"),
+        "installed_total_bytes": (
+            metrics.get("packaged_installed_bytes")
+            if metrics.get("packaged_installed_bytes") is not None
+            else metrics.get("installed_total_bytes")
+        ),
+        "installed_prefix_bytes": metrics.get("installed_total_bytes"),
         "external_shared_libs": json.dumps(external, sort_keys=True),
         "archive_bytes": metrics.get("archive_bytes"),
         "startup_ms_median": metrics.get("startup_ms_median"),
