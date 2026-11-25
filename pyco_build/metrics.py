@@ -153,18 +153,49 @@ def _strip_copy(core_files: list[Path]) -> tuple[int | None, str | None]:
     return total, None
 
 
+def _hyperfine_statistics(
+    data: dict[str, object], result: dict[str, object]
+) -> dict[str, object]:
+    """Return the timing statistics from either Hyperfine JSON schema."""
+
+    summary = result.get("summary")
+    if isinstance(summary, dict) and summary:
+        metric = str(data.get("primary_metric") or "time_wall_clock")
+        statistics = summary.get(metric)
+        if not isinstance(statistics, dict):
+            statistics = summary.get("time_wall_clock")
+        if not isinstance(statistics, dict):
+            statistics = next(
+                (value for value in summary.values() if isinstance(value, dict)),
+                None,
+            )
+        if isinstance(statistics, dict):
+            return statistics
+    return result
+
+
 def _parse_hyperfine(path: Path, command: list[str], runs: int) -> dict[str, float]:
     data = json.loads(path.read_text(encoding="utf-8"))
     result = data["results"][0]
-    return {
-        "median_ms": float(result["median"]) * 1000.0,
-        "mean_ms": float(result["mean"]) * 1000.0,
-        "min_ms": float(result["min"]) * 1000.0,
-        "max_ms": float(result["max"]) * 1000.0,
-        "stddev_ms": float(result.get("stddev", 0.0)) * 1000.0,
-        "runs": runs,
-        "command": shlex.join(command),
-    }
+    statistics = _hyperfine_statistics(data, result)
+    measurements = result.get("measurements")
+    effective_runs = (
+        len(measurements) if isinstance(measurements, list) and measurements else runs
+    )
+    try:
+        return {
+            "median_ms": float(statistics["median"]) * 1000.0,
+            "mean_ms": float(statistics["mean"]) * 1000.0,
+            "min_ms": float(statistics["min"]) * 1000.0,
+            "max_ms": float(statistics["max"]) * 1000.0,
+            "stddev_ms": float(statistics.get("stddev", 0.0)) * 1000.0,
+            "runs": effective_runs,
+            "command": shlex.join(command),
+        }
+    except (KeyError, TypeError, ValueError) as error:
+        raise MetricsError(
+            f"unsupported Hyperfine JSON schema in {path}: {error}"
+        ) from error
 
 
 def _measure_fallback(

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import sys
 import tarfile
@@ -16,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from pyco_build.build import _flag_tokens_applied, _flags_in_makefile  # noqa: E402
 from pyco_build.config import ConfigError, load_config  # noqa: E402
+from pyco_build.metrics import _parse_hyperfine  # noqa: E402
 from pyco_build.paths import BuildPaths  # noqa: E402
 from pyco_build.source import SourceError, _safe_extract  # noqa: E402
 from pyco_build.util import (  # noqa: E402
@@ -230,6 +232,56 @@ class BuildFlagTests(unittest.TestCase):
             self.assertTrue(_flag_tokens_applied("-Os", effective))
             self.assertTrue(_flag_tokens_applied("-Wl,--gc-sections", effective))
             self.assertFalse(_flag_tokens_applied("-Oz", effective))
+
+
+class HyperfineParseTests(unittest.TestCase):
+    def _parse(self, payload: dict[str, object], runs: int = 5) -> dict[str, float]:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "hyperfine.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            return _parse_hyperfine(path, ["python", "-c", "pass"], runs)
+
+    def test_hyperfine_2_schema(self) -> None:
+        payload = {
+            "primary_metric": "time_wall_clock",
+            "results": [
+                {
+                    "measurements": [{"time_wall_clock": {"value": 0.1}}] * 3,
+                    "summary": {
+                        "time_wall_clock": {
+                            "median": 0.5,
+                            "mean": 0.6,
+                            "min": 0.4,
+                            "max": 0.7,
+                            "stddev": 0.1,
+                        }
+                    },
+                }
+            ],
+        }
+        parsed = self._parse(payload)
+        self.assertEqual(parsed["median_ms"], 500.0)
+        self.assertEqual(parsed["mean_ms"], 600.0)
+        self.assertEqual(parsed["min_ms"], 400.0)
+        self.assertEqual(parsed["max_ms"], 700.0)
+        self.assertEqual(parsed["stddev_ms"], 100.0)
+        self.assertEqual(parsed["runs"], 3)
+
+    def test_legacy_hyperfine_schema(self) -> None:
+        payload = {
+            "results": [
+                {
+                    "median": 0.25,
+                    "mean": 0.3,
+                    "min": 0.2,
+                    "max": 0.4,
+                    "stddev": 0.05,
+                }
+            ]
+        }
+        parsed = self._parse(payload, runs=7)
+        self.assertEqual(parsed["median_ms"], 250.0)
+        self.assertEqual(parsed["runs"], 7)
 
 
 class SourceSafetyTests(unittest.TestCase):
