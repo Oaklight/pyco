@@ -19,6 +19,7 @@ from pyco_build.build import _flag_tokens_applied, _flags_in_makefile  # noqa: E
 from pyco_build.config import ConfigError, load_config  # noqa: E402
 from pyco_build.metrics import _parse_hyperfine  # noqa: E402
 from pyco_build.paths import BuildPaths  # noqa: E402
+from pyco_build.report import _row, _write_report  # noqa: E402
 from pyco_build.source import SourceError, _safe_extract  # noqa: E402
 from pyco_build.util import (  # noqa: E402
     duplicate_safe_size,
@@ -282,6 +283,38 @@ class HyperfineParseTests(unittest.TestCase):
         parsed = self._parse(payload, runs=7)
         self.assertEqual(parsed["median_ms"], 250.0)
         self.assertEqual(parsed["runs"], 7)
+
+
+class ReportTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = load_config(ROOT)
+
+    def test_failure_reason_string_is_not_split(self) -> None:
+        row = _row(
+            {
+                "profile": "baseline",
+                "failure_reasons": "zerodep full tests not run",
+            }
+        )
+        self.assertEqual(row["failure_reasons"], "zerodep full tests not run")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.md"
+            _write_report(path, [row], self.config)
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("- baseline: zerodep full tests not run", text)
+        self.assertNotIn("z; e", text)
+
+    def test_failure_reason_list_is_preserved(self) -> None:
+        row = _row(
+            {
+                "profile": "size",
+                "failure_reasons": ["full CPython suite not run", "network disabled"],
+            }
+        )
+        self.assertEqual(
+            row["failure_reasons"], "full CPython suite not run; network disabled"
+        )
 
 
 class SourceSafetyTests(unittest.TestCase):

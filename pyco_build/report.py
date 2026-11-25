@@ -41,6 +41,17 @@ CSV_FIELDS = [
 ]
 
 
+def _as_text_list(value: Any) -> list[str]:
+    """Normalize a metrics field that may be a string or a sequence."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
 def _row(metrics: dict[str, Any]) -> dict[str, Any]:
     toolchain = metrics.get("toolchain", {})
     if isinstance(toolchain, dict):
@@ -50,7 +61,7 @@ def _row(metrics: dict[str, Any]) -> dict[str, Any]:
     else:
         toolchain_text = str(toolchain)
     external = metrics.get("external_shared_libs", [])
-    failures = metrics.get("failure_reasons", [])
+    failures = _as_text_list(metrics.get("failure_reasons"))
     return {
         "cpython_version": metrics.get("cpython_version", ""),
         "cpython_tag": metrics.get("cpython_tag", ""),
@@ -78,7 +89,7 @@ def _row(metrics: dict[str, Any]) -> dict[str, Any]:
         "abi_result": metrics.get("abi_result", "not-run"),
         "package_smoke_result": metrics.get("package_smoke_result", "not-run"),
         "eligible": metrics.get("eligible", False),
-        "failure_reasons": "; ".join(str(item) for item in failures),
+        "failure_reasons": "; ".join(failures),
     }
 
 
@@ -260,12 +271,10 @@ def _write_report(path: Path, rows: list[dict[str, Any]], config: Config) -> Non
     lines.extend(["", "## Failures and missing gates", ""])
     any_failure = False
     for row in rows:
-        reasons = row.get("failure_reasons") or []
+        reasons = _as_text_list(row.get("failure_reasons"))
         if reasons:
             any_failure = True
-            lines.append(
-                f"- {row.get('profile')}: {'; '.join(str(item) for item in reasons)}"
-            )
+            lines.append(f"- {row.get('profile')}: {'; '.join(reasons)}")
     if not any_failure:
         lines.append("No recorded failure reasons.")
     lines.extend(
