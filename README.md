@@ -118,6 +118,11 @@ symbol requirements of each artifact must be checked with `objdump -T` before
 any portability or release claim. These archives are not general-purpose Linux
 distributions.
 
+Native extensions link conda-forge libraries such as OpenSSL, SQLite, and
+`libffi`. The archive does not bundle those libraries. Run an extracted artifact
+with the toolchain `lib` directory on `LD_LIBRARY_PATH`, or bundle the required
+libraries before redistribution.
+
 ## Layout
 
 ```text

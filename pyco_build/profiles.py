@@ -100,6 +100,11 @@ class ProfileSpec:
             environment["PKG_CONFIG_PATH"] = pkgconfig_dir
             environment["PKG_CONFIG_LIBDIR"] = pkgconfig_dir
             environment["LIBRARY_PATH"] = lib_dir
+            existing_library_path = environment.get("LD_LIBRARY_PATH", "").strip()
+            library_paths = [lib_dir]
+            if existing_library_path:
+                library_paths.append(existing_library_path)
+            environment["LD_LIBRARY_PATH"] = ":".join(library_paths)
         return environment
 
 

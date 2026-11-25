@@ -282,10 +282,16 @@ def python_runtime_env(prefix: Path) -> dict[str, str]:
     env = os.environ.copy()
     lib_dir = str(prefix / "lib")
     bin_dir = str(prefix / "bin")
+    library_paths = [lib_dir]
+    conda_prefix = env.get("PYCO_CONDA_PREFIX") or env.get("CONDA_PREFIX")
+    if conda_prefix:
+        conda_lib_dir = str(Path(conda_prefix) / "lib")
+        if conda_lib_dir != lib_dir:
+            library_paths.append(conda_lib_dir)
     existing_library_path = env.get("LD_LIBRARY_PATH", "")
-    env["LD_LIBRARY_PATH"] = lib_dir + (
-        f":{existing_library_path}" if existing_library_path else ""
-    )
+    if existing_library_path:
+        library_paths.append(existing_library_path)
+    env["LD_LIBRARY_PATH"] = ":".join(library_paths)
     env["PATH"] = bin_dir + (f":{env['PATH']}" if env.get("PATH") else "")
     env["PYTHONNOUSERSITE"] = "1"
     if "SSL_CERT_FILE" not in env:

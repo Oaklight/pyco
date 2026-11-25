@@ -87,6 +87,7 @@ class ProfileEnvironmentTests(unittest.TestCase):
             "LDFLAGS": "-Wl,--gc-sections -Wl,-rpath,/opt/conda/lib",
             "CPATH": "/opt/conda/include",
             "PKG_CONFIG_PATH": "/contaminated/pkgconfig",
+            "LD_LIBRARY_PATH": "/custom/lib",
         }
 
     def test_baseline_discards_conda_flags(self) -> None:
@@ -104,6 +105,7 @@ class ProfileEnvironmentTests(unittest.TestCase):
         self.assertNotIn("CPATH", env)
         self.assertEqual(env["PKG_CONFIG_PATH"], f"{self.prefix}/lib/pkgconfig")
         self.assertEqual(env["LIBRARY_PATH"], f"{self.prefix}/lib")
+        self.assertEqual(env["LD_LIBRARY_PATH"], f"{self.prefix}/lib:/custom/lib")
         self.assertEqual(env["PATH"], "/usr/bin")
 
     def test_profile_flags_are_exact(self) -> None:
@@ -133,6 +135,7 @@ class ProfileEnvironmentTests(unittest.TestCase):
             env["LDFLAGS"],
             "-L/locked/prefix/lib -Wl,-rpath-link,/locked/prefix/lib",
         )
+        self.assertEqual(env["LD_LIBRARY_PATH"], "/locked/prefix/lib")
         self.assertNotIn("activated", env["CPPFLAGS"])
 
     def test_environment_does_not_mutate_base(self) -> None:

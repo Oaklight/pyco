@@ -36,6 +36,7 @@ DRY_RUN_ENV_KEYS = (
     "LDFLAGS",
     "PKG_CONFIG_PATH",
     "LIBRARY_PATH",
+    "LD_LIBRARY_PATH",
 )
 
 
