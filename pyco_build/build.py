@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import shlex
+import shutil
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -18,6 +19,7 @@ from .util import (
     PycoError,
     copy_tree,
     find_python,
+    is_elf,
     log,
     python_runtime_env,
     remove_tree,
@@ -145,6 +147,26 @@ def _apply_patches(spec: BuildSpec, work_src: Path, logs_dir: Path) -> list[str]
             )
         applied.append(str(patch_file.relative_to(spec.root)))
     return applied
+
+
+def _set_install_rpath(paths: BuildPaths, python: Path) -> str:
+    """Make the installed interpreter find libpython relative to its prefix."""
+
+    rpath = "$ORIGIN/../lib"
+    target = python.resolve()
+    if not is_elf(target):
+        raise BuildError(f"installed interpreter is not an ELF file: {target}")
+    patchelf = shutil.which("patchelf")
+    if not patchelf:
+        raise BuildError("patchelf was not found on PATH")
+    result = run_command(
+        [patchelf, "--set-rpath", rpath, str(target)],
+        log_path=paths.logs_dir / "rpath.log",
+        check=False,
+    )
+    if result.returncode != 0:
+        raise BuildError(f"patchelf failed; see {result.log_path}")
+    return rpath
 
 
 def _config_probe(python: Path, prefix: Path) -> dict[str, Any]:
@@ -360,6 +382,7 @@ def build(
             raise BuildError(f"install failed; see {installed_result.log_path}")
 
         installed = _verify_installed_build(spec, paths, effective_flags)
+        installed["rpath"] = _set_install_rpath(paths, Path(installed["python"]))
         installed["duration_s"] = round(time.monotonic() - started, 3)
         metadata = _save_metadata(
             spec,
