@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import BuildSpec
+from .distributions import DEFAULT_DISTRIBUTION
 
 
 @dataclass(frozen=True)
@@ -90,9 +91,15 @@ class BuildPaths:
 
     @property
     def package_archive(self) -> Path:
+        return self.package_archive_for(DEFAULT_DISTRIBUTION)
+
+    def package_archive_for(self, distribution: str) -> Path:
         release = os.environ.get("PYCO_RELEASE", __version__)
         return (
             self.root
             / "dist"
-            / f"pyco-{release}-cpython{self.version}-{self.target}-{self.profile}.tar.xz"
+            / (
+                f"pyco-{release}-cpython{self.version}-{self.target}-"
+                f"{self.profile}-{distribution}.tar.xz"
+            )
         )

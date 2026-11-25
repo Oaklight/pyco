@@ -3,6 +3,7 @@ PYTHON ?= python3
 VERSION ?= 3.14
 TARGET ?= linux-x86_64
 PROFILE ?= baseline
+DISTRIBUTION ?=
 RUNS ?= 10
 JOBS ?= $(shell nproc 2>/dev/null || echo 1)
 
@@ -22,7 +23,7 @@ help:
 	@echo "  test        - Run smoke gates for one built PROFILE"
 	@echo "  test-full   - Run full CPython and zerodep gates"
 	@echo "  measure     - Measure size, dependencies, startup, and RSS"
-	@echo "  package     - Create and verify a distribution archive"
+	@echo "  package     - Create and verify distribution archives"
 	@echo "  report      - Write results/summary.csv and results/report.md"
 	@echo "  matrix      - Build, test, measure, and package all five profiles"
 	@echo "  clean       - Remove work/, out/, and dist/"
@@ -31,6 +32,7 @@ help:
 	@echo "  CONDA_PREFIX=$(CONDA_PREFIX)"
 	@echo "  PYTHON=$(PYTHON)"
 	@echo "  VERSION=$(VERSION)  TARGET=$(TARGET)  PROFILE=$(PROFILE)"
+	@echo "  DISTRIBUTION=$(DISTRIBUTION)  (empty packages headless, headed, and test)"
 	@echo "  RUNS=$(RUNS)  JOBS=$(JOBS)"
 
 conda:
@@ -63,7 +65,7 @@ measure:
 	./scripts/measure.sh "$(VERSION)" "$(PROFILE)" "$(TARGET)" --runs "$(RUNS)"
 
 package:
-	./scripts/package.sh "$(VERSION)" "$(PROFILE)" "$(TARGET)"
+	./scripts/package.sh "$(VERSION)" "$(PROFILE)" "$(TARGET)" $(if $(DISTRIBUTION),--distribution "$(DISTRIBUTION)")
 
 report:
 	./scripts/report.sh

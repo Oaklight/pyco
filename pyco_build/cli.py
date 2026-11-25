@@ -8,6 +8,7 @@ from typing import Sequence
 from . import __version__
 from .build import build as build_cell
 from .config import Config, load_config
+from .distributions import load_distributions
 from .metrics import measure as measure_cell
 from .package import package as package_cell
 from .paths import BuildPaths
@@ -39,6 +40,11 @@ def _print_list(config: Config) -> None:
         profile = config.profiles[key]
         suffix = " (experimental)" if profile.experimental else ""
         print(f"  {key}: {profile.description}{suffix}")
+    distributions = load_distributions(config.root)
+    print("Distributions:")
+    for variant in distributions.variants:
+        suffix = " (default)" if variant.name == distributions.default else ""
+        print(f"  {variant.name}: {variant.description}{suffix}")
 
 
 def _cmd_fetch(config: Config, args: argparse.Namespace) -> int:
@@ -82,7 +88,7 @@ def _cmd_measure(config: Config, args: argparse.Namespace) -> int:
 
 def _cmd_package(config: Config, args: argparse.Namespace) -> int:
     spec = config.resolve(args.version, args.profile, args.target)
-    package_cell(spec)
+    package_cell(spec, only=args.distribution)
     return 0
 
 
@@ -110,7 +116,9 @@ def _cmd_paths(config: Config, args: argparse.Namespace) -> int:
     print(f"build={paths.build_dir}")
     print(f"prefix={paths.prefix}")
     print(f"results={paths.results_dir}")
-    print(f"archive={paths.package_archive}")
+    distributions = load_distributions(config.root)
+    for variant in distributions.variants:
+        print(f"archive[{variant.name}]={paths.package_archive_for(variant.name)}")
     return 0
 
 
@@ -165,11 +173,17 @@ def _parser() -> argparse.ArgumentParser:
     measure.set_defaults(func=_cmd_measure)
 
     package = subparsers.add_parser(
-        "package", help="create and verify a distribution archive"
+        "package", help="create and verify distribution archives"
     )
     package.add_argument("version")
     package.add_argument("profile")
     package.add_argument("target")
+    package.add_argument(
+        "--distribution",
+        action="append",
+        default=None,
+        help="build only this distribution; repeat to select several",
+    )
     package.set_defaults(func=_cmd_package)
 
     report = subparsers.add_parser(

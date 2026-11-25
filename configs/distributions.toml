@@ -1,0 +1,27 @@
+schema_version = 1
+default = "headless"
+
+[variants.headless]
+description = "Runtime without tests, development archives, IDLE, or Tk GUI support."
+exclude = [
+  "lib/python*/test",
+  "lib/python*/idlelib",
+  "lib/python*/tkinter",
+  "lib/python*/config-*/libpython*.a",
+  "lib/python*/config-*/python.o",
+]
+smoke_imports = ["ssl", "sqlite3", "ctypes"]
+
+[variants.headed]
+description = "Runtime with IDLE and Tk GUI support, without tests or development archives."
+exclude = [
+  "lib/python*/test",
+  "lib/python*/config-*/libpython*.a",
+  "lib/python*/config-*/python.o",
+]
+smoke_imports = ["ssl", "sqlite3", "ctypes", "tkinter"]
+
+[variants.test]
+description = "Complete installation including the CPython test suite and development files."
+exclude = []
+smoke_imports = ["ssl", "sqlite3", "ctypes", "test"]

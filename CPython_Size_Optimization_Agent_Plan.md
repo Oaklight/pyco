@@ -146,9 +146,17 @@ Use **absolute source paths** for configure, ensure `make` is run from the build
 - Fix locale, timezone, `SOURCE_DATE_EPOCH` where appropriate, deterministic archive order/mtime, and path normalization. **Do not claim bit-for-bit reproducibility until independently verified.**
 - Cache source archives and build dependencies, not mutable build outputs across incompatible profiles. Cache keys must include CPython tag, toolchain identity, target, profile, and patches.
 
-## 6. Standard library completeness and ABI contract
+## 6. Standard library completeness, distributions, and ABI contract
 
-The installed distribution must retain all upstream stdlib Python files, data, tests, scripts, `ensurepip` wheels, and native extensions. Preserve `venv`, `idlelib`, `tkinter`, and platform-applicable optional extensions. Install all necessary build dependencies; compare the native-extension inventory to a baseline built in the same environment. Do not delete `__pycache__` or stdlib components to manufacture size improvements.
+Every profile install prefix must retain all upstream stdlib Python files, data, tests, scripts, `ensurepip` wheels, and native extensions. Preserve `venv`, `idlelib`, `tkinter`, and platform-applicable optional extensions. Install all necessary build dependencies; compare the native-extension inventory to a baseline built in the same environment. Do not delete `__pycache__` or stdlib components to manufacture size improvements. This complete prefix is the compatibility baseline and the source of the `test` distribution.
+
+Packaging derives deployment variants from the complete prefix. Variants are explicit output transformations. They must not change profile measurements or compatibility claims:
+
+- `headless`: runtime for servers and containers. Excludes the CPython test suite, `idlelib`, `tkinter`, and development archives (`libpython*.a`, `python.o`). Keeps headers, `config-*/Makefile`, `ensurepip`, `venv`, native extensions, and `site-packages`.
+- `headed`: adds Tk and IDLE for workstation use, but still excludes the test suite and development archives.
+- `test`: no exclusions. Used for compatibility testing and redistribution analysis.
+
+Declare variants in `configs/distributions.toml`. For every archive, record the exclude patterns, installed bytes, archive bytes, SHA256, and a smoke import result. Report variant sizes separately from the profile's installed size and interpreter core size. Do not present a pruned download as a smaller interpreter.
 
 Implement validation of:
 
@@ -168,7 +176,7 @@ For each build capture machine-readable JSON and summary CSV with:
 
 - `cpython_version`, `cpython_tag`, `cpython_commit_or_sha256`, `pyco_commit`, `zerodep_commit`, `target`, `profile`, `toolchain`, `configure_flags`, `cflags`, `ldflags`.
 - `core_unstripped_bytes`, `core_stripped_bytes`: sum **regular unique ELF payloads** for executable and `libpython` (if present), excluding symlink duplicates.
-- `stdlib_source_data_bytes`, `native_extensions_bytes`, `installed_total_bytes`, `external_shared_libs` (list and size), `archive_bytes`.
+- `stdlib_source_data_bytes`, `native_extensions_bytes`, `installed_total_bytes`, `external_shared_libs` (list and size), `archive_bytes`, `default_distribution`, and per-variant `installed_bytes`, `archive_bytes`, and `status`.
 - Startup latency for `python -S -c pass`, normal `python -c pass`, and a representative stdlib import workload; use repeated runs with median/spread and identify cold vs warm cache semantics honestly.
 - Peak RSS for startup/import and one CPU-bound and one I/O-bound representative workload; test hardware and environment.
 - CPython and zerodep pass/fail/skip counts, extension inventory diff, ABI result, package smoke result, `eligible` boolean, and failure reasons.
@@ -313,8 +321,8 @@ jobs:
 
 - [ ] One Pyco codebase with version-agnostic build scripts and immutable CPython source pin.
 - [ ] CPython 3.14 builds independently under `baseline`, `size`, `lto`, `static`, and `clang-oz` on Linux x86-64.
-- [ ] Every build has a distinct build directory, install prefix, logs, metrics, and archive.
-- [ ] No stdlib pruning; stdlib and native-extension inventory verified against baseline.
+- [ ] Every build has a distinct build directory, install prefix, logs, metrics, and set of distribution archives.
+- [ ] Complete stdlib is preserved in every build prefix and in the `test` distribution; `headless`/`headed` exclusions are explicit, smoke-tested, and measured separately.
 - [ ] CPython smoke and zerodep tests execute with results recorded; ABI checks implemented.
 - [ ] GitHub Actions CI matrix uploads artifacts and summary even if individual cells fail.
 - [ ] Metrics distinguish interpreter core, full install, archive, and external dependencies.

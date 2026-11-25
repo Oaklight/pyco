@@ -2,9 +2,11 @@
 
 Pyco builds compact, full-compatibility CPython distributions and measures each
 candidate against a baseline. It is build orchestration around pinned upstream
-CPython, not a CPython fork. The standard library, `ensurepip`, `venv`,
-`idlelib`, `tkinter`, `test`, and optional native extensions are preserved.
-Nothing is pruned to manufacture a smaller number.
+CPython, not a CPython fork. Every profile build preserves the standard library,
+`ensurepip`, `venv`, `idlelib`, `tkinter`, `test`, and optional native
+extensions. Packaging then derives three deployable variants from the same
+stripped tree: a compact `headless` runtime, a `headed` runtime with Tk/IDLE,
+and a complete `test` distribution.
 
 **Status:** experimental. The build and measurement framework is implemented,
 but no release profile has been approved. No CPython build has been verified in
@@ -48,11 +50,13 @@ conda activate "$HOME/ml_lab/envs/pyco"
 falls back to `environment.yml`, and it updates an existing prefix from
 `environment.yml`. Set `PYCO_CONDA_USE_LOCK=0` to force the YAML path.
 
-`scripts/package.sh` copies the install prefix to a staging tree, strips debug
-symbols from ELF binaries, relocatable objects, and static archives there, and
-writes a deterministic `tar.xz` archive. The original `out/` prefix keeps its
-symbols for debugging. Run packaging before measurement so the report can record
-archive and stripped installation sizes.
+`scripts/package.sh` copies the install prefix once, strips debug symbols from
+ELF binaries, relocatable objects, and static archives in the staging tree, and
+writes deterministic `tar.xz` archives for every configured distribution. The
+original `out/` prefix keeps its symbols for debugging. Run packaging before
+measurement so the report can record archive and stripped installation sizes.
+Use `--distribution headless` to build one variant while iterating; repeated
+flags select several.
 
 To use the environment without activating it, which is how CI runs builds:
 
@@ -89,6 +93,29 @@ tests, zerodep tests, ABI checks, stdlib inventory checks, and measurements
 pass. Measurement reports a Pareto frontier; the smallest build is not selected
 automatically.
 
+## Distributions
+
+Every profile produces a complete install prefix. Packaging derives three
+archives from one stripped staging tree, so the profile result and all variants
+stay consistent.
+
+| Distribution | Excludes | Smoke imports | Intended use |
+| --- | --- | --- | --- |
+| `headless` (default) | `test`, `idlelib`, `tkinter`, `config-*/libpython*.a`, `config-*/python.o` | `ssl`, `sqlite3`, `ctypes` | Servers, containers, and agent sandboxes |
+| `headed` | `test`, development archives and objects | `ssl`, `sqlite3`, `ctypes`, `tkinter` | Workstations that need Tk/IDLE |
+| `test` | nothing | `ssl`, `sqlite3`, `ctypes`, `test` | Compatibility testing and redistribution analysis |
+
+All variants keep `include/` and `config-*/Makefile`. `pip install cffi` fails
+without the CPython headers, and `venv` uses the Makefile through `sysconfig`.
+`ensurepip`, `venv`, `lib-dynload`, and `site-packages` are kept in every
+variant. Edit `configs/distributions.toml` to change the variants; the default
+distribution is `headless`.
+
+Variant names are appended to archive filenames, for example
+`pyco-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`. The package
+metadata keeps one entry per variant. The report matrix uses the default
+distribution and lists every variant's installed and archive size separately.
+
 ## Commands
 
 | Command | Action |
@@ -101,7 +128,8 @@ automatically.
 | `make test PROFILE=size` | Run smoke and ABI gates |
 | `make test-full PROFILE=size` | Run full CPython and zerodep gates |
 | `make measure PROFILE=size RUNS=20` | Collect size, startup, RSS, and workload data |
-| `make package PROFILE=size` | Create a stripped, deterministic `tar.xz` and smoke-test it |
+| `make package PROFILE=size` | Create stripped archives for every distribution and smoke-test them |
+| `make package PROFILE=size DISTRIBUTION=headless` | Create and test one distribution |
 | `make report` | Write `results/summary.csv` and `results/report.md` |
 | `make matrix` | Run all five profiles without stopping on unrelated failures |
 | `make clean` | Remove `work/`, `out/`, and `dist/` |
@@ -154,7 +182,7 @@ results/        metadata per cell; summary.csv and report.md are tracked
 `.github/workflows/ci.yml` runs the unit checks, then builds the five profiles
 as independent matrix jobs with `fail-fast: false`. Each job creates its conda
 environment from `conda-linux-64.lock`, runs fetch, build, smoke tests,
-packaging, and measurement, and uploads its JSON results and archive. An
+packaging, and measurement, and uploads its JSON results and archives. An
 aggregate job downloads all profile results and regenerates the report.
 
 `.github/workflows/benchmark.yml` is the manual full-regression and repeated

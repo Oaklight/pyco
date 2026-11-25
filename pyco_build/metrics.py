@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import BuildSpec, Config
+from .distributions import DEFAULT_DISTRIBUTION
 from .paths import BuildPaths
 from .util import (
     PycoError,
@@ -287,27 +288,59 @@ def _peak_rss(command: list[str], prefix: Path) -> tuple[int | None, str | None]
     return int(match.group(1)), None
 
 
+def _distribution_metrics(metadata: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Normalize per-distribution package metadata for reports."""
+
+    raw = metadata.get("variants")
+    if not isinstance(raw, dict):
+        return {}
+    distributions: dict[str, dict[str, Any]] = {}
+    for name, value in raw.items():
+        if not isinstance(value, dict):
+            continue
+        distributions[str(name)] = {
+            "description": value.get("description", ""),
+            "archive": value.get("archive"),
+            "archive_format": value.get("archive_format"),
+            "archive_bytes": value.get("archive_bytes"),
+            "archive_sha256": value.get("archive_sha256"),
+            "installed_bytes": value.get("installed_bytes"),
+            "status": value.get("status", "not-run"),
+        }
+    return distributions
+
+
 def _package_info(paths: BuildPaths) -> dict[str, Any]:
-    archive = paths.package_archive
     metadata = (
         read_json(paths.package_metadata) if paths.package_metadata.exists() else {}
     )
-    if not archive.exists():
-        return {
-            "path": str(archive),
-            "bytes": None,
-            "sha256": None,
-            "installed_bytes": None,
-            "status": "not-run",
-            "archive_format": None,
+    distributions = _distribution_metrics(metadata)
+    default_name = str(metadata.get("default_distribution") or DEFAULT_DISTRIBUTION)
+    default = distributions.get(default_name)
+    if default is None:
+        archive = paths.package_archive
+        default = {
+            "archive": str(archive) if archive.exists() else None,
+            "archive_bytes": archive.stat().st_size if archive.exists() else None,
+            "archive_sha256": (
+                metadata.get("archive_sha256")
+                or (sha256_file(archive) if archive.exists() else None)
+            ),
+            "archive_format": metadata.get("archive_format"),
+            "installed_bytes": metadata.get("installed_bytes"),
+            "status": metadata.get("status", "not-run"),
         }
+        if archive.exists() or metadata:
+            distributions[default_name] = default
     return {
-        "path": str(archive),
-        "bytes": archive.stat().st_size,
-        "sha256": metadata.get("archive_sha256") or sha256_file(archive),
-        "installed_bytes": metadata.get("installed_bytes"),
-        "status": metadata.get("status", "not-run"),
-        "archive_format": metadata.get("archive_format"),
+        "default_distribution": default_name,
+        "path": default.get("archive"),
+        "bytes": default.get("archive_bytes"),
+        "sha256": default.get("archive_sha256"),
+        "installed_bytes": default.get("installed_bytes"),
+        "status": default.get("status", "not-run"),
+        "archive_format": default.get("archive_format"),
+        "distributions": distributions,
     }
 
 
@@ -467,6 +500,8 @@ def measure(
         "archive_bytes": package["bytes"],
         "archive_format": package.get("archive_format"),
         "archive_sha256": package["sha256"],
+        "default_distribution": package.get("default_distribution"),
+        "distributions": package.get("distributions", {}),
         "startup_ms": startup,
         "startup_ms_median": startup_normal.get("median_ms"),
         "startup_imports_ms_median": startup_imports.get("median_ms"),

@@ -18,7 +18,14 @@ sys.path.insert(0, str(ROOT))
 
 from pyco_build.build import _flag_tokens_applied, _flags_in_makefile  # noqa: E402
 from pyco_build.config import ConfigError, load_config  # noqa: E402
-from pyco_build.metrics import _parse_hyperfine  # noqa: E402
+from pyco_build.distributions import (  # noqa: E402
+    DistributionError,
+    load_distributions,
+)
+from pyco_build.metrics import (  # noqa: E402
+    _distribution_metrics,
+    _parse_hyperfine,
+)
 from pyco_build.package import _build_archive, _elf_type  # noqa: E402
 from pyco_build.paths import BuildPaths  # noqa: E402
 from pyco_build.report import _row, _write_report  # noqa: E402
@@ -82,6 +89,81 @@ class ConfigTests(unittest.TestCase):
         selections = self.config.release_selection
         self.assertTrue(selections)
         self.assertFalse(any(selection.approved for selection in selections))
+
+
+class DistributionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.distributions = load_distributions(ROOT)
+
+    def test_expected_variants_exist(self) -> None:
+        names = {variant.name for variant in self.distributions.variants}
+        self.assertEqual(names, {"headless", "headed", "test"})
+        self.assertEqual(self.distributions.default, "headless")
+
+    def test_headless_excludes_matched_tree(self) -> None:
+        headless = self.distributions.get("headless")
+        self.assertTrue(headless.matches_exclude("lib/python3.14/test/test_abc.py"))
+        self.assertTrue(headless.matches_exclude("lib/python3.14/tkinter/__init__.py"))
+        self.assertTrue(
+            headless.matches_exclude("lib/python3.14/config-3.14-x86_64/python.o")
+        )
+        self.assertFalse(headless.matches_exclude("lib/python3.14/json/__init__.py"))
+        self.assertFalse(
+            headless.matches_exclude("lib/python3.14/site-packages/test_helper.py")
+        )
+
+    def test_headed_keeps_tkinter_but_drops_tests(self) -> None:
+        headed = self.distributions.get("headed")
+        self.assertFalse(headed.matches_exclude("lib/python3.14/tkinter/__init__.py"))
+        self.assertTrue(headed.matches_exclude("lib/python3.14/test/test_abc.py"))
+
+    def test_test_variant_excludes_nothing(self) -> None:
+        full = self.distributions.get("test")
+        self.assertFalse(full.matches_exclude("lib/python3.14/test/test_abc.py"))
+        self.assertEqual(full.exclude, ())
+
+    def test_unknown_distribution_fails(self) -> None:
+        with self.assertRaises(DistributionError):
+            self.distributions.get("does-not-exist")
+
+    def test_trailing_slash_is_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            configs = root / "configs"
+            configs.mkdir()
+            (configs / "distributions.toml").write_text(
+                "\n".join(
+                    [
+                        "schema_version = 1",
+                        'default = "plain"',
+                        "[variants.plain]",
+                        'exclude = ["lib/python*/test/"]',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            variant = load_distributions(root).get("plain")
+            self.assertTrue(variant.matches_exclude("lib/python3.14/test/test_abc.py"))
+
+    def test_parent_traversal_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            configs = root / "configs"
+            configs.mkdir()
+            (configs / "distributions.toml").write_text(
+                "\n".join(
+                    [
+                        "schema_version = 1",
+                        'default = "plain"',
+                        "[variants.plain]",
+                        'exclude = ["../escape"]',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(DistributionError):
+                load_distributions(root)
 
 
 class ProfileEnvironmentTests(unittest.TestCase):
@@ -170,7 +252,10 @@ class PathTests(unittest.TestCase):
 
     def test_package_archive_uses_xz(self) -> None:
         baseline = BuildPaths(self.config.resolve("3.14", "baseline", "linux-x86_64"))
-        self.assertTrue(baseline.package_archive.name.endswith(".tar.xz"))
+        self.assertTrue(baseline.package_archive.name.endswith("-headless.tar.xz"))
+        headed = baseline.package_archive_for("headed")
+        self.assertTrue(headed.name.endswith("-headed.tar.xz"))
+        self.assertNotEqual(baseline.package_archive, headed)
 
     def test_paths_are_distinct_for_each_target(self) -> None:
         self.config.targets["linux-arm64"] = type(
@@ -226,6 +311,30 @@ class PackageTests(unittest.TestCase):
                 member = archive.extractfile("pyco-root/payload.txt")
                 assert member is not None
                 self.assertEqual(member.read(), b"pyco\n")
+
+    def test_archive_excludes_matched_trees(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            prefix = root / "prefix"
+            (prefix / "lib" / "python3.14" / "test").mkdir(parents=True)
+            (prefix / "lib" / "python3.14" / "json").mkdir(parents=True)
+            (prefix / "lib" / "python3.14" / "test" / "test_abc.py").write_text(
+                "x\n", encoding="utf-8"
+            )
+            (prefix / "lib" / "python3.14" / "json" / "__init__.py").write_text(
+                "y\n", encoding="utf-8"
+            )
+            archive_path = root / "variant.tar.xz"
+            _build_archive(
+                prefix,
+                archive_path,
+                "pyco-root",
+                exclude=lambda relative: relative.startswith("lib/python3.14/test/"),
+            )
+            with tarfile.open(archive_path, "r:*") as archive:
+                names = archive.getnames()
+            self.assertIn("pyco-root/lib/python3.14/json/__init__.py", names)
+            self.assertNotIn("pyco-root/lib/python3.14/test/test_abc.py", names)
 
 
 class AccountingTests(unittest.TestCase):
@@ -380,6 +489,66 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(row["installed_prefix_bytes"], 100)
         self.assertEqual(row["archive_bytes"], 50)
         self.assertEqual(row["package_smoke_result"], "pass")
+
+    def test_distribution_variants_are_reported(self) -> None:
+        row = _row(
+            {
+                "profile": "baseline",
+                "cpython_version": "3.14.9",
+                "default_distribution": "headless",
+                "distributions": {
+                    "headless": {
+                        "installed_bytes": 80,
+                        "archive_bytes": 50,
+                        "status": "pass",
+                    },
+                    "test": {
+                        "installed_bytes": 200,
+                        "archive_bytes": 70,
+                        "status": "pass",
+                    },
+                },
+            }
+        )
+        self.assertEqual(row["default_distribution"], "headless")
+        parsed = json.loads(row["distribution_metrics"])
+        self.assertEqual(parsed["headless"]["archive_bytes"], 50)
+        self.assertEqual(parsed["test"]["installed_bytes"], 200)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.md"
+            _write_report(path, [row], self.config)
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("## Distribution variants", text)
+        self.assertIn("| headless (default) | 80 | 50 | pass |", text)
+        self.assertIn("| test | 200 | 70 | pass |", text)
+
+    def test_distribution_metadata_is_normalized(self) -> None:
+        normalized = _distribution_metrics(
+            {
+                "variants": {
+                    "headless": {
+                        "archive": "/tmp/headless.tar.xz",
+                        "archive_bytes": 50,
+                        "installed_bytes": 80,
+                        "status": "pass",
+                    },
+                    "ignored": "not-a-table",
+                }
+            }
+        )
+        self.assertEqual(
+            normalized["headless"],
+            {
+                "description": "",
+                "archive": "/tmp/headless.tar.xz",
+                "archive_format": None,
+                "archive_bytes": 50,
+                "archive_sha256": None,
+                "installed_bytes": 80,
+                "status": "pass",
+            },
+        )
+        self.assertNotIn("ignored", normalized)
 
 
 class RegressionTempDirTests(unittest.TestCase):

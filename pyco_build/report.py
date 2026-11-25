@@ -30,6 +30,8 @@ CSV_FIELDS = [
     "installed_prefix_bytes",
     "external_shared_libs",
     "archive_bytes",
+    "default_distribution",
+    "distribution_metrics",
     "startup_ms_median",
     "rss_kib",
     "cpython_tests",
@@ -63,6 +65,8 @@ def _row(metrics: dict[str, Any]) -> dict[str, Any]:
         toolchain_text = str(toolchain)
     external = metrics.get("external_shared_libs", [])
     failures = _as_text_list(metrics.get("failure_reasons"))
+    raw_distributions = metrics.get("distributions", {})
+    distributions = raw_distributions if isinstance(raw_distributions, dict) else {}
     return {
         "cpython_version": metrics.get("cpython_version", ""),
         "cpython_tag": metrics.get("cpython_tag", ""),
@@ -87,6 +91,9 @@ def _row(metrics: dict[str, Any]) -> dict[str, Any]:
         "installed_prefix_bytes": metrics.get("installed_total_bytes"),
         "external_shared_libs": json.dumps(external, sort_keys=True),
         "archive_bytes": metrics.get("archive_bytes"),
+        "default_distribution": metrics.get("default_distribution", ""),
+        "distribution_metrics": json.dumps(distributions, sort_keys=True),
+        "distributions": distributions,
         "startup_ms_median": metrics.get("startup_ms_median"),
         "rss_kib": metrics.get("rss_kib"),
         "cpython_tests": metrics.get("cpython_tests", "not-run"),
@@ -253,6 +260,42 @@ def _write_report(path: Path, rows: list[dict[str, Any]], config: Config) -> Non
                 eligible="yes" if row.get("eligible") else "no",
             )
         )
+    lines.extend(["", "## Distribution variants", ""])
+    has_variants = False
+    for row in rows:
+        raw_variants = row.get("distributions")
+        if isinstance(raw_variants, dict) and raw_variants:
+            has_variants = True
+            break
+    if not has_variants:
+        lines.append("No packaged distribution variants are recorded.")
+    else:
+        lines.append(
+            "| Version | Target | Profile | Distribution | Installed | Archive | Smoke |"
+        )
+        lines.append("| --- | --- | --- | --- | ---: | ---: | --- |")
+        for row in rows:
+            raw_variants = row.get("distributions")
+            if not isinstance(raw_variants, dict):
+                continue
+            for name in sorted(raw_variants):
+                info = raw_variants[name]
+                if not isinstance(info, dict):
+                    continue
+                label = name
+                if name == row.get("default_distribution"):
+                    label = f"{name} (default)"
+                lines.append(
+                    "| {version} | {target} | {profile} | {name} | {installed} | {archive} | {status} |".format(
+                        version=row.get("cpython_version", ""),
+                        target=row.get("target", ""),
+                        profile=row.get("profile", ""),
+                        name=label,
+                        installed=_format_bytes(info.get("installed_bytes")),
+                        archive=_format_bytes(info.get("archive_bytes")),
+                        status=info.get("status", "not-run"),
+                    )
+                )
     lines.extend(["", "## Baseline deltas", ""])
     for row in rows:
         lines.append(f"- {row.get('profile')}: {_baseline_delta(rows, row)}")
@@ -292,6 +335,7 @@ def _write_report(path: Path, rows: list[dict[str, Any]], config: Config) -> Non
             "- Symlinks and hardlinks count once.",
             "- Startup measurements are warm-cache medians; no cold-cache claim is made.",
             "- Installed bytes include the stdlib, extensions, headers, and metadata under the prefix.",
+            "- Matrix installed and archive bytes describe the default distribution; variant rows report each archive separately.",
             "- Archive bytes are reported separately from installed bytes.",
             "",
         ]

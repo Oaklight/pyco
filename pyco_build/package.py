@@ -9,9 +9,10 @@ import shutil
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Sequence
 
 from .config import BuildSpec
+from .distributions import load_distributions
 from .paths import BuildPaths
 from .util import (
     PycoError,
@@ -57,12 +58,16 @@ def _is_archive(path: Path) -> bool:
         return False
 
 
-def _tree_bytes(root: Path) -> int:
-    return sum(
-        path.stat().st_size
-        for path in root.rglob("*")
-        if path.is_file() and not path.is_symlink()
-    )
+def _tree_bytes(root: Path, exclude: Callable[[str], bool] | None = None) -> int:
+    total = 0
+    for path in root.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if exclude is not None and exclude(relative):
+            continue
+        total += path.stat().st_size
+    return total
 
 
 def _strip_tree(root: Path) -> dict[str, Any]:
@@ -128,7 +133,13 @@ def _add_entry(tar: tarfile.TarFile, path: Path, arcname: str, epoch: int) -> No
         tar.addfile(info)
 
 
-def _build_archive(prefix: Path, archive: Path, arc_root: str) -> None:
+def _build_archive(
+    prefix: Path,
+    archive: Path,
+    arc_root: str,
+    *,
+    exclude: Callable[[str], bool] | None = None,
+) -> None:
     archive.parent.mkdir(parents=True, exist_ok=True)
     temporary = archive.with_suffix(archive.suffix + ".tmp")
     if temporary.exists():
@@ -140,7 +151,10 @@ def _build_archive(prefix: Path, archive: Path, arc_root: str) -> None:
         for name in sorted(filenames):
             path = Path(dirpath) / name
             relative = path.relative_to(prefix)
-            entries.append((f"{arc_root}/{relative.as_posix()}", path))
+            relative_text = relative.as_posix()
+            if exclude is not None and exclude(relative_text):
+                continue
+            entries.append((f"{arc_root}/{relative_text}", path))
     entries.sort(key=lambda item: item[0])
 
     with temporary.open("wb") as raw:
@@ -159,7 +173,12 @@ def _build_archive(prefix: Path, archive: Path, arc_root: str) -> None:
     os.replace(temporary, archive)
 
 
-def _smoke_extracted(archive: Path, version: str, profile_cc: str) -> dict[str, Any]:
+def _smoke_extracted(
+    archive: Path,
+    version: str,
+    profile_cc: str,
+    imports: tuple[str, ...] = ("ssl", "sqlite3", "ctypes"),
+) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="pyco-package-") as directory:
         extract_root = Path(directory)
         with tarfile.open(archive, "r:*") as handle:
@@ -172,8 +191,12 @@ def _smoke_extracted(archive: Path, version: str, profile_cc: str) -> dict[str, 
             raise PackageError("archive does not contain exactly one root directory")
         runtime_root = entries[0]
         python = find_python(runtime_root, version)
+        if imports:
+            code = f"import {', '.join(imports)}; print('package-ok')"
+        else:
+            code = "print('package-ok')"
         result = run_command(
-            [str(python), "-c", "import ssl, sqlite3, ctypes; print('package-ok')"],
+            [str(python), "-c", code],
             env=python_runtime_env(runtime_root),
             check=False,
         )
@@ -184,24 +207,62 @@ def _smoke_extracted(archive: Path, version: str, profile_cc: str) -> dict[str, 
         return {
             "runtime_root": str(runtime_root),
             "python": str(python),
+            "imports": list(imports),
             "status": "pass",
         }
 
 
-def package(spec: BuildSpec) -> dict[str, Any]:
-    """Create a deterministic tarball and test it from a clean extraction."""
+def package(spec: BuildSpec, *, only: Sequence[str] | None = None) -> dict[str, Any]:
+    """Create deterministic distribution archives and smoke-test them.
+
+    The install prefix is copied and stripped once. Every configured
+    distribution is then archived from that staging tree. Passing ``only``
+    limits the run to the named distributions; previously built variants are
+    retained in the metadata when their archives still exist.
+
+    Args:
+        spec: Resolved build cell.
+        only: Distribution names to build. None builds every configured variant.
+
+    Returns:
+        The package metadata written to ``package.json``.
+    """
 
     paths = BuildPaths(spec)
     if not paths.prefix.exists():
         raise PackageError(f"install prefix missing: {paths.prefix}; run build first")
-    archive = paths.package_archive
-    arc_root = (
+    distributions = load_distributions(spec.root)
+    requested = (
+        list(dict.fromkeys(only))
+        if only
+        else [variant.name for variant in distributions.variants]
+    )
+    selected = [distributions.get(name) for name in requested]
+    configured = {variant.name for variant in distributions.variants}
+    base_root = (
         f"pyco-cpython{spec.version.version}-{spec.target.name}-{spec.profile.name}"
     )
     log(f"packaging {paths.prefix}")
     prefix_bytes = _tree_bytes(paths.prefix)
+    variants: dict[str, dict[str, Any]] = {}
+    selected_names = {variant.name for variant in selected}
+    existing = (
+        read_json(paths.package_metadata) if paths.package_metadata.exists() else {}
+    )
+    if (
+        existing.get("schema_version") == 2
+        and existing.get("version") == spec.version.version
+        and existing.get("target") == spec.target.name
+        and existing.get("profile") == spec.profile.name
+    ):
+        for name, info in existing.get("variants", {}).items():
+            if name in selected_names or name not in configured:
+                continue
+            archive_text = info.get("archive")
+            if isinstance(archive_text, str) and Path(archive_text).is_file():
+                variants[name] = info
     with tempfile.TemporaryDirectory(prefix="pyco-package-") as directory:
-        staging = Path(directory) / arc_root
+        staging = Path(directory) / base_root
         shutil.copytree(
             paths.prefix,
             staging,
@@ -209,33 +270,71 @@ def package(spec: BuildSpec) -> dict[str, Any]:
             copy_function=shutil.copy2,
         )
         strip = _strip_tree(staging)
-        installed_bytes = _tree_bytes(staging)
         log(f"stripped {strip['files']} ELF files: {strip['bytes_saved']} bytes saved")
-        _build_archive(staging, archive, arc_root)
-    digest = sha256_file(archive)
-    smoke = _smoke_extracted(archive, spec.version.version, spec.profile.cc)
-    compression = "xz-9e" if archive.suffix == ".xz" else "gzip-9"
+        for variant in selected:
+            archive = paths.package_archive_for(variant.name)
+            arc_root = f"{base_root}-{variant.name}"
+            exclude = variant.matches_exclude
+            installed_bytes = _tree_bytes(staging, exclude)
+            _build_archive(staging, archive, arc_root, exclude=exclude)
+            digest = sha256_file(archive)
+            smoke = _smoke_extracted(
+                archive,
+                spec.version.version,
+                spec.profile.cc,
+                imports=variant.smoke_imports,
+            )
+            variants[variant.name] = {
+                "description": variant.description,
+                "archive": str(archive),
+                "archive_format": archive.name.rsplit(".tar.", 1)[-1],
+                "compression": "xz-9e" if archive.suffix == ".xz" else "gzip-9",
+                "archive_bytes": archive.stat().st_size,
+                "archive_sha256": digest,
+                "arc_root": arc_root,
+                "installed_bytes": installed_bytes,
+                "exclude": list(variant.exclude),
+                "smoke": smoke,
+                "status": smoke["status"],
+            }
+            log(
+                f"packaged {variant.name}: {installed_bytes} installed bytes, "
+                f"{archive.stat().st_size} archive bytes"
+            )
+    default_name = distributions.default
+    default = variants.get(default_name)
     metadata: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "version": spec.version.version,
         "cpython_tag": spec.version.tag,
         "target": spec.target.name,
         "profile": spec.profile.name,
-        "archive": str(archive),
-        "archive_format": archive.name.rsplit(".tar.", 1)[-1],
-        "compression": compression,
-        "archive_bytes": archive.stat().st_size,
-        "archive_sha256": digest,
-        "arc_root": arc_root,
+        "default_distribution": default_name,
         "source_installed_bytes": prefix_bytes,
-        "installed_bytes": installed_bytes,
         "strip": strip,
-        "status": smoke["status"],
-        "smoke": smoke,
+        "variants": variants,
         "created_at": utc_now(),
     }
+    if default is not None:
+        metadata.update(
+            {
+                "archive": default["archive"],
+                "archive_format": default["archive_format"],
+                "compression": default["compression"],
+                "archive_bytes": default["archive_bytes"],
+                "archive_sha256": default["archive_sha256"],
+                "arc_root": default["arc_root"],
+                "installed_bytes": default["installed_bytes"],
+                "status": default["status"],
+                "smoke": default["smoke"],
+            }
+        )
     write_json(paths.package_metadata, metadata)
-    log(f"packaged {archive} ({archive.stat().st_size} bytes)")
+    if default is not None:
+        log(
+            f"packaged {default_name} archive {default['archive']} "
+            f"({default['archive_bytes']} bytes)"
+        )
     return metadata
 
 
