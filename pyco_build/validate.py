@@ -331,7 +331,10 @@ def _check_zerodep(
         ["make", "test", f"PYTHON={venv / 'bin' / 'python'}"],
         required=True,
         cwd=tests_root / "zerodep",
-        env={**os.environ, "PATH": f"{venv / 'bin'}:{os.environ.get('PATH', '')}"},
+        env={
+            **python_runtime_env(prefix),
+            "PATH": f"{venv / 'bin'}:{os.environ.get('PATH', '')}",
+        },
         timeout=3600,
     )
 

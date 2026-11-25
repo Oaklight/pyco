@@ -71,6 +71,7 @@ jobs:
           RUNS: ${{ inputs.runs }}
           FULL: ${{ inputs.full }}
           NETWORK: ${{ inputs.network }}
+          TEST_JOBS: "1"
         run: |
           export PATH="$PYCO_CONDA_PREFIX/bin:$PATH"
           export PYTHONPATH="$PWD"
@@ -81,7 +82,7 @@ jobs:
           if [[ "$NETWORK" == "true" ]]; then network=--network; fi
           ./scripts/fetch.sh "$PYCO_VERSION" --zerodep
           ./scripts/build.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --jobs "$(nproc)"
-          ./scripts/test.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" "$mode" $network --jobs "$(nproc)"
+          ./scripts/test.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" "$mode" $network --jobs "$TEST_JOBS"
           ./scripts/measure.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET" --runs "$RUNS"
           ./scripts/package.sh "$PYCO_VERSION" "$PROFILE" "$PYCO_TARGET"
           ./scripts/report.sh
