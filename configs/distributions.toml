@@ -7,8 +7,10 @@ exclude = [
   "lib/python*/test",
   "lib/python*/idlelib",
   "lib/python*/tkinter",
+  "lib/python*/lib-dynload/_tkinter*",
   "lib/python*/config-*/libpython*.a",
   "lib/python*/config-*/python.o",
+  "bin/idle*",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes"]
 
@@ -25,3 +27,64 @@ smoke_imports = ["ssl", "sqlite3", "ctypes", "tkinter"]
 description = "Complete installation including the CPython test suite and development files."
 exclude = []
 smoke_imports = ["ssl", "sqlite3", "ctypes", "test"]
+
+[variants.micro]
+description = "Runtime-only: no package installer, tests, docs, headers, or development files."
+exclude = [
+  "lib/python*/test",
+  "lib/python*/idlelib",
+  "lib/python*/tkinter",
+  "lib/python*/lib-dynload/_tkinter*",
+  "lib/python*/ensurepip",
+  "lib/python*/site-packages",
+  "lib/python*/pydoc_data",
+  "lib/python*/unittest",
+  "lib/python*/turtledemo",
+  "lib/python*/venv",
+  "lib/python*/config-*",
+  "lib/python*/lib-dynload/_test*",
+  "lib/python*/lib-dynload/_curses*",
+  "lib/python*/lib-dynload/_dbm*",
+  "lib/python*/lib-dynload/_gdbm*",
+  "lib/python*/lib-dynload/readline*",
+  "lib/python*/lib-dynload/xxlimited*",
+  "lib/python*/lib-dynload/_xxtestfuzz*",
+  "include",
+  "share",
+  "lib/pkgconfig",
+  "bin/pip*",
+  "bin/idle*",
+  "bin/python*-config",
+]
+smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]
+
+[variants.nano]
+description = "Micro runtime without precompiled bytecode; modules compile on first import."
+exclude = [
+  "lib/python*/test",
+  "lib/python*/idlelib",
+  "lib/python*/tkinter",
+  "lib/python*/lib-dynload/_tkinter*",
+  "lib/python*/ensurepip",
+  "lib/python*/site-packages",
+  "lib/python*/pydoc_data",
+  "lib/python*/unittest",
+  "lib/python*/turtledemo",
+  "lib/python*/venv",
+  "lib/python*/config-*",
+  "lib/python*/lib-dynload/_test*",
+  "lib/python*/lib-dynload/_curses*",
+  "lib/python*/lib-dynload/_dbm*",
+  "lib/python*/lib-dynload/_gdbm*",
+  "lib/python*/lib-dynload/readline*",
+  "lib/python*/lib-dynload/xxlimited*",
+  "lib/python*/lib-dynload/_xxtestfuzz*",
+  "lib/python*/__pycache__",
+  "include",
+  "share",
+  "lib/pkgconfig",
+  "bin/pip*",
+  "bin/idle*",
+  "bin/python*-config",
+]
+smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]

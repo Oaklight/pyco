@@ -103,7 +103,7 @@ class DistributionTests(unittest.TestCase):
 
     def test_expected_variants_exist(self) -> None:
         names = {variant.name for variant in self.distributions.variants}
-        self.assertEqual(names, {"headless", "headed", "test"})
+        self.assertEqual(names, {"headless", "headed", "test", "micro", "nano"})
         self.assertEqual(self.distributions.default, "headless")
 
     def test_headless_excludes_matched_tree(self) -> None:
@@ -111,12 +111,52 @@ class DistributionTests(unittest.TestCase):
         self.assertTrue(headless.matches_exclude("lib/python3.14/test/test_abc.py"))
         self.assertTrue(headless.matches_exclude("lib/python3.14/tkinter/__init__.py"))
         self.assertTrue(
+            headless.matches_exclude(
+                "lib/python3.14/lib-dynload/_tkinter.cpython-314-x86_64-linux-gnu.so"
+            )
+        )
+        self.assertTrue(headless.matches_exclude("bin/idle3.14"))
+        self.assertTrue(
             headless.matches_exclude("lib/python3.14/config-3.14-x86_64/python.o")
         )
         self.assertFalse(headless.matches_exclude("lib/python3.14/json/__init__.py"))
         self.assertFalse(
             headless.matches_exclude("lib/python3.14/site-packages/test_helper.py")
         )
+
+    def test_micro_drops_installer_docs_and_dev_files(self) -> None:
+        micro = self.distributions.get("micro")
+        self.assertTrue(
+            micro.matches_exclude("lib/python3.14/site-packages/pip/__init__.py")
+        )
+        self.assertTrue(micro.matches_exclude("lib/python3.14/ensurepip/__init__.py"))
+        self.assertTrue(micro.matches_exclude("include/python3.14/Python.h"))
+        self.assertTrue(micro.matches_exclude("bin/pip3.14"))
+        self.assertTrue(micro.matches_exclude("bin/python3.14-config"))
+        self.assertTrue(
+            micro.matches_exclude(
+                "lib/python3.14/lib-dynload/_tkinter.cpython-314-x86_64-linux-gnu.so"
+            )
+        )
+        self.assertFalse(
+            micro.matches_exclude("lib/python3.14/__pycache__/json.cpython-314.pyc")
+        )
+        self.assertFalse(micro.matches_exclude("lib/python3.14/json/__init__.py"))
+        self.assertFalse(
+            micro.matches_exclude(
+                "lib/python3.14/lib-dynload/_ssl.cpython-314-x86_64-linux-gnu.so"
+            )
+        )
+
+    def test_nano_also_drops_precompiled_bytecode(self) -> None:
+        nano = self.distributions.get("nano")
+        self.assertTrue(
+            nano.matches_exclude("lib/python3.14/__pycache__/json.cpython-314.pyc")
+        )
+        self.assertTrue(
+            nano.matches_exclude("lib/python3.14/site-packages/pip/__init__.py")
+        )
+        self.assertFalse(nano.matches_exclude("lib/python3.14/json/__init__.py"))
 
     def test_headed_keeps_tkinter_but_drops_tests(self) -> None:
         headed = self.distributions.get("headed")
