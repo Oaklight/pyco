@@ -25,7 +25,7 @@ help:
 	@echo "  measure     - Measure size, dependencies, startup, and RSS"
 	@echo "  package     - Create and verify distribution archives"
 	@echo "  report      - Write results/summary.csv and results/report.md"
-	@echo "  matrix      - Build, test, measure, and package all five profiles"
+	@echo "  matrix      - Build, test, measure, and package all six profiles"
 	@echo "  clean       - Remove work/, out/, and dist/"
 	@echo ""
 	@echo "Variables:"

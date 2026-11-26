@@ -57,7 +57,7 @@ class ConfigTests(unittest.TestCase):
     def test_expected_profiles_exist(self) -> None:
         self.assertEqual(
             set(self.config.profiles),
-            {"baseline", "size", "lto", "static", "clang-oz"},
+            {"baseline", "size", "lto", "static", "clang-oz", "lean"},
         )
 
     def test_version_pin_is_immutable(self) -> None:
@@ -85,10 +85,14 @@ class ConfigTests(unittest.TestCase):
         static = self.config.profiles["static"]
         lto = self.config.profiles["lto"]
         clang = self.config.profiles["clang-oz"]
+        lean = self.config.profiles["lean"]
         self.assertIn("--disable-shared", static.configure)
         self.assertIn("--with-lto", lto.configure)
         self.assertEqual(clang.cc, "clang")
         self.assertEqual(clang.cflags, "-Oz")
+        self.assertIn("--without-doc-strings", lean.configure)
+        self.assertIn("-ffunction-sections", lean.cflags)
+        self.assertIn("--gc-sections", lean.ldflags)
 
     def test_release_selection_is_not_approved(self) -> None:
         selections = self.config.release_selection
@@ -247,12 +251,17 @@ class ProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(env["PATH"], "/usr/bin")
 
     def test_profile_flags_are_exact(self) -> None:
+        lean_cflags = (
+            "-Oz -ffunction-sections -fdata-sections "
+            "-fno-asynchronous-unwind-tables -fno-ident"
+        )
         expected = {
             "baseline": "",
             "size": "-Os",
             "lto": "-Os",
             "static": "-Os",
             "clang-oz": "-Oz",
+            "lean": lean_cflags,
         }
         for name, cflags in expected.items():
             with self.subTest(profile=name):

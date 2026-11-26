@@ -54,3 +54,14 @@ cppflags = ""
 cxxflags = ""
 ldflags = ""
 experimental = true
+
+[profiles.lean]
+description = "Clang -Oz with docstrings removed and unused sections discarded"
+cc = "clang"
+cxx = "clang++"
+configure = ["--enable-shared", "--with-ensurepip=install", "--without-doc-strings"]
+cflags = "-Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-ident"
+cppflags = ""
+cxxflags = ""
+ldflags = "-Wl,--gc-sections -Wl,--build-id=none"
+experimental = true
