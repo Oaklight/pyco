@@ -107,7 +107,9 @@ class DistributionTests(unittest.TestCase):
 
     def test_expected_variants_exist(self) -> None:
         names = {variant.name for variant in self.distributions.variants}
-        self.assertEqual(names, {"headless", "headed", "test", "micro", "nano"})
+        self.assertEqual(
+            names, {"headless", "headed", "test", "micro", "nano", "runtime"}
+        )
         self.assertEqual(self.distributions.default, "headless")
 
     def test_headless_excludes_matched_tree(self) -> None:
@@ -161,6 +163,30 @@ class DistributionTests(unittest.TestCase):
             nano.matches_exclude("lib/python3.14/site-packages/pip/__init__.py")
         )
         self.assertFalse(nano.matches_exclude("lib/python3.14/json/__init__.py"))
+
+    def test_runtime_keeps_third_party_packages_without_pip(self) -> None:
+        runtime = self.distributions.get("runtime")
+        self.assertFalse(
+            runtime.matches_exclude("lib/python3.14/site-packages/numpy/__init__.py")
+        )
+        self.assertFalse(
+            runtime.matches_exclude("lib/python3.14/site-packages/pandas/__init__.py")
+        )
+        self.assertFalse(
+            runtime.matches_exclude(
+                "lib/python3.14/site-packages/numpy/core/_multiarray_umath.so"
+            )
+        )
+        self.assertTrue(
+            runtime.matches_exclude("lib/python3.14/site-packages/pip/__init__.py")
+        )
+        self.assertTrue(
+            runtime.matches_exclude(
+                "lib/python3.14/site-packages/pip-26.2.2.dist-info/METADATA"
+            )
+        )
+        self.assertTrue(runtime.matches_exclude("lib/python3.14/ensurepip/__init__.py"))
+        self.assertTrue(runtime.matches_exclude("bin/pip3.14"))
 
     def test_headed_keeps_tkinter_but_drops_tests(self) -> None:
         headed = self.distributions.get("headed")

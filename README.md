@@ -6,10 +6,10 @@ SnugPy builds compact, deployable Python runtimes and measures each candidate
 against a full CPython baseline. It starts from pinned upstream CPython rather
 than reimplementing the language, so compatibility comes first. Every profile
 build preserves the standard library, `ensurepip`, `venv`, `idlelib`, `tkinter`,
-`test`, and optional native extensions. Packaging then derives five deployable
-variants from the same stripped tree: `headless`, `headed`, `test`, `micro`, and
-`nano`. The `micro` and `nano` variants drop the installer, headers, docs, and
-development files for runtime-only sandboxes.
+`test`, and optional native extensions. Packaging then derives six deployable
+variants from the same stripped tree: `headless`, `headed`, `test`, `micro`,
+`nano`, and `runtime`. The `micro`, `nano`, and `runtime` variants drop the
+installer, headers, docs, and development files for runtime-only sandboxes.
 
 **Status:** experimental. The build and measurement framework is implemented,
 but no release profile has been approved. GitHub Actions is the build and
@@ -108,7 +108,7 @@ automatically.
 
 ## Distributions
 
-Every profile produces a complete install prefix. Packaging derives five
+Every profile produces a complete install prefix. Packaging derives six
 archives from one stripped staging tree, so the profile result and all variants
 stay consistent.
 
@@ -117,17 +117,21 @@ stay consistent.
 | `headless` (default) | tests, IDLE, Tk, `config-*/libpython*.a`, `config-*/python.o` | `ssl`, `sqlite3`, `ctypes` | Servers and general containers |
 | `headed` | tests, development archives and objects | `ssl`, `sqlite3`, `ctypes`, `tkinter` | Workstations that need Tk/IDLE |
 | `test` | nothing | `ssl`, `sqlite3`, `ctypes`, `test` | Compatibility testing and redistribution analysis |
-| `micro` | installer, docs, tests, headers, development files, Tk, curses, dbm, readline | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Agent sandboxes and minimal runtime images |
+| `micro` | installer, docs, tests, headers, development files, Tk, curses, dbm, readline | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Stdlib-only agent sandboxes |
 | `nano` | `micro` plus `__pycache__` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Smallest image; imports compile from source |
+| `runtime` | `micro` minus installer, keeps `site-packages` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Agent sandboxes with preinstalled packages |
 
 `headless`, `headed`, and `test` keep `include/`, `config-*/Makefile`,
 `ensurepip`, `venv`, and `site-packages`, so `pip install cffi` and `venv`
-work. `micro` and `nano` are runtime-only: no pip, no venv, no headers, no
-build scripts, no `pydoc_data`, and no test or terminal-UI extension modules.
-`nano` also drops precompiled bytecode, so each process compiles modules on
-first import; expect a small startup cost when the runtime filesystem is
-read-only. Edit `configs/distributions.toml` to change the variants; the default
-distribution is `headless`.
+work. `micro`, `nano`, and `runtime` are runtime-only: no pip, no venv, no
+headers, no build scripts, no `pydoc_data`, and no test or terminal-UI
+extension modules. `runtime` keeps `site-packages`, so packages installed at
+image-build time (numpy, pandas, and others) survive; only `pip`,
+`pip-*.dist-info`, `ensurepip`, and `bin/pip*` are removed. `nano` also drops
+precompiled bytecode, so each process compiles modules on first import; expect
+a small startup cost when the runtime filesystem is read-only. Edit
+`configs/distributions.toml` to change the variants; the default distribution
+is `headless`.
 
 Variant names are appended to archive filenames, for example
 `snugpy-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`. The package
