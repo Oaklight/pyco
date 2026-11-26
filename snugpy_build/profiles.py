@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from .util import PycoError
+from .util import SnugPyError
 
 # Conda activation exports optimized and hardened compiler flags. They are
 # intentionally discarded so that each profile is compared from the same base.
@@ -32,7 +32,7 @@ _CONTAMINATING_FLAGS = (
 )
 
 
-class ProfileError(PycoError):
+class ProfileError(SnugPyError):
     """Raised for invalid profile configuration."""
 
 
@@ -71,7 +71,7 @@ class ProfileSpec:
         Returns:
             A copy of the source environment with conda optimization flags
             removed, profile flags applied, and conda include/library paths
-            supplied explicitly. ``PYCO_CONDA_PREFIX`` takes precedence over
+            supplied explicitly. ``SNUGPY_CONDA_PREFIX`` takes precedence over
             ``CONDA_PREFIX`` so CI can use a locked prefix without activating
             it.
         """
@@ -86,7 +86,9 @@ class ProfileSpec:
         environment["CXXFLAGS"] = self.cxxflags.strip()
         environment["LDFLAGS"] = self.ldflags.strip()
 
-        prefix = environment.get("PYCO_CONDA_PREFIX") or environment.get("CONDA_PREFIX")
+        prefix = environment.get("SNUGPY_CONDA_PREFIX") or environment.get(
+            "CONDA_PREFIX"
+        )
         if prefix:
             include_dir = f"{prefix.rstrip('/')}/include"
             lib_dir = f"{prefix.rstrip('/')}/lib"

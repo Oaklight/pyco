@@ -15,7 +15,7 @@ link_tool() {
 	fi
 }
 
-# Conda compiler packages use target-prefixed names. Pyco profiles call the
+# Conda compiler packages use target-prefixed names. SnugPy profiles call the
 # canonical names, so provide stable aliases inside the environment.
 link_tool x86_64-conda-linux-gnu-gcc gcc
 link_tool x86_64-conda-linux-gnu-gcc cc

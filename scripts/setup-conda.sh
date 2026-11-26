@@ -2,13 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PREFIX="${1:-${PYCO_CONDA_PREFIX:-}}"
+PREFIX="${1:-${SNUGPY_CONDA_PREFIX:-}}"
 LOCK_FILE="${ROOT_DIR}/conda-linux-64.lock"
-USE_LOCK="${PYCO_CONDA_USE_LOCK:-1}"
+USE_LOCK="${SNUGPY_CONDA_USE_LOCK:-1}"
 
 if [[ -z "${PREFIX}" ]]; then
 	if [[ -d "${HOME}/ml_lab" ]]; then
-		PREFIX="${HOME}/ml_lab/envs/pyco"
+		PREFIX="${HOME}/ml_lab/envs/snugpy"
 	else
 		PREFIX="${ROOT_DIR}/.conda-env"
 	fi
@@ -71,7 +71,7 @@ elif [[ "${USE_LOCK}" == "1" && -f "${LOCK_FILE}" ]]; then
 	if ! "${CONDA_BIN}" create --yes --prefix "${PREFIX}" --file "${LOCK_FILE}" \
 		--override-channels -c conda-forge; then
 		echo "lock-file creation failed" >&2
-		echo "remove ${PREFIX} and rerun with PYCO_CONDA_USE_LOCK=0 to use environment.yml" >&2
+		echo "remove ${PREFIX} and rerun with SNUGPY_CONDA_USE_LOCK=0 to use environment.yml" >&2
 		exit 1
 	fi
 else
@@ -82,4 +82,4 @@ fi
 "${ROOT_DIR}/scripts/conda-aliases.sh" "${PREFIX}"
 echo "conda environment ready: ${PREFIX}"
 echo "activate with: source \"$("${CONDA_BIN}" info --base)/etc/profile.d/conda.sh\" && conda activate \"${PREFIX}\""
-echo "without activation: export PYCO_CONDA_PREFIX=\"${PREFIX}\" && export PATH=\"${PREFIX}/bin:\${PATH}\""
+echo "without activation: export SNUGPY_CONDA_PREFIX=\"${PREFIX}\" && export PATH=\"${PREFIX}/bin:\${PATH}\""

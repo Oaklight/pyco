@@ -14,7 +14,7 @@ CSV_FIELDS = [
     "cpython_version",
     "cpython_tag",
     "cpython_commit_or_sha256",
-    "pyco_commit",
+    "snugpy_commit",
     "zerodep_commit",
     "target",
     "profile",
@@ -71,7 +71,7 @@ def _row(metrics: dict[str, Any]) -> dict[str, Any]:
         "cpython_version": metrics.get("cpython_version", ""),
         "cpython_tag": metrics.get("cpython_tag", ""),
         "cpython_commit_or_sha256": metrics.get("cpython_commit_or_sha256", ""),
-        "pyco_commit": metrics.get("pyco_commit", ""),
+        "snugpy_commit": metrics.get("snugpy_commit", ""),
         "zerodep_commit": metrics.get("zerodep_commit", ""),
         "target": metrics.get("target", ""),
         "profile": metrics.get("profile", ""),
@@ -206,7 +206,7 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def _write_report(path: Path, rows: list[dict[str, Any]], config: Config) -> None:
     lines = [
-        "# Pyco measurement report",
+        "# SnugPy measurement report",
         "",
         f"Generated: {utc_now()}",
         "",

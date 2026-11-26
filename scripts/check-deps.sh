@@ -36,7 +36,7 @@ if [[ "${INSTALL}" -eq 1 ]]; then
 		echo "apt-get is required for --install-ubuntu" >&2
 		exit 1
 	}
-	mapfile -t packages < <(python3 -m pyco_build.cli deps --target "${TARGET}")
+	mapfile -t packages < <(python3 -m snugpy_build.cli deps --target "${TARGET}")
 	if [[ "${#packages[@]}" -eq 0 ]]; then
 		echo "no packages configured for target ${TARGET}" >&2
 		exit 1

@@ -16,27 +16,27 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from pyco_build.build import _flag_tokens_applied, _flags_in_makefile  # noqa: E402
-from pyco_build.config import ConfigError, load_config  # noqa: E402
-from pyco_build.distributions import (  # noqa: E402
+from snugpy_build.build import _flag_tokens_applied, _flags_in_makefile  # noqa: E402
+from snugpy_build.config import ConfigError, load_config  # noqa: E402
+from snugpy_build.distributions import (  # noqa: E402
     DistributionError,
     load_distributions,
 )
-from pyco_build.metrics import (  # noqa: E402
+from snugpy_build.metrics import (  # noqa: E402
     _distribution_metrics,
     _parse_hyperfine,
 )
-from pyco_build.package import _build_archive, _elf_type  # noqa: E402
-from pyco_build.paths import BuildPaths  # noqa: E402
-from pyco_build.report import _row, _write_report  # noqa: E402
-from pyco_build.source import SourceError, _safe_extract  # noqa: E402
-from pyco_build.validate import (  # noqa: E402
+from snugpy_build.package import _build_archive, _elf_type  # noqa: E402
+from snugpy_build.paths import BuildPaths  # noqa: E402
+from snugpy_build.report import _row, _write_report  # noqa: E402
+from snugpy_build.source import SourceError, _safe_extract  # noqa: E402
+from snugpy_build.validate import (  # noqa: E402
     _MULTIPROCESSING_SOCKET_BUDGET,
     _REGRTEST_TMPDIR_BUDGET,
     _SUN_PATH_MAX,
     _regression_temp_dir,
 )
-from pyco_build.util import (  # noqa: E402
+from snugpy_build.util import (  # noqa: E402
     duplicate_safe_size,
     is_elf,
     iter_unique_regular_files,
@@ -216,10 +216,10 @@ class ProfileEnvironmentTests(unittest.TestCase):
                 self.assertEqual(env["CC"], self.config.profiles[name].cc)
                 self.assertEqual(env["CXX"], self.config.profiles[name].cxx)
 
-    def test_pyco_prefix_takes_precedence(self) -> None:
+    def test_snugpy_prefix_takes_precedence(self) -> None:
         base = {
             "CONDA_PREFIX": "/activated/prefix",
-            "PYCO_CONDA_PREFIX": "/locked/prefix",
+            "SNUGPY_CONDA_PREFIX": "/locked/prefix",
             "LDFLAGS": "-Wl,--gc-sections",
         }
         env = self.config.profiles["size"].environment(base)
@@ -298,19 +298,19 @@ class PackageTests(unittest.TestCase):
             root = Path(directory)
             prefix = root / "prefix"
             prefix.mkdir()
-            (prefix / "payload.txt").write_text("pyco\n", encoding="utf-8")
+            (prefix / "payload.txt").write_text("snugpy\n", encoding="utf-8")
             (prefix / "empty").mkdir()
             first = root / "first.tar.xz"
             second = root / "second.tar.xz"
-            _build_archive(prefix, first, "pyco-root")
-            _build_archive(prefix, second, "pyco-root")
+            _build_archive(prefix, first, "snugpy-root")
+            _build_archive(prefix, second, "snugpy-root")
             self.assertEqual(first.read_bytes(), second.read_bytes())
             with tarfile.open(first, "r:*") as archive:
                 names = archive.getnames()
-                self.assertIn("pyco-root/payload.txt", names)
-                member = archive.extractfile("pyco-root/payload.txt")
+                self.assertIn("snugpy-root/payload.txt", names)
+                member = archive.extractfile("snugpy-root/payload.txt")
                 assert member is not None
-                self.assertEqual(member.read(), b"pyco\n")
+                self.assertEqual(member.read(), b"snugpy\n")
 
     def test_archive_excludes_matched_trees(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -328,13 +328,13 @@ class PackageTests(unittest.TestCase):
             _build_archive(
                 prefix,
                 archive_path,
-                "pyco-root",
+                "snugpy-root",
                 exclude=lambda relative: relative.startswith("lib/python3.14/test/"),
             )
             with tarfile.open(archive_path, "r:*") as archive:
                 names = archive.getnames()
-            self.assertIn("pyco-root/lib/python3.14/json/__init__.py", names)
-            self.assertNotIn("pyco-root/lib/python3.14/test/test_abc.py", names)
+            self.assertIn("snugpy-root/lib/python3.14/json/__init__.py", names)
+            self.assertNotIn("snugpy-root/lib/python3.14/test/test_abc.py", names)
 
 
 class AccountingTests(unittest.TestCase):
@@ -363,10 +363,10 @@ class AccountingTests(unittest.TestCase):
     def test_sha256_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "payload"
-            path.write_bytes(b"pyco")
+            path.write_bytes(b"snugpy")
             self.assertEqual(
                 sha256_file(path),
-                "4e104dfbea13954793fec37c0550346ff6fbbe544750303656592b5436eb9c14",
+                "e64774089588feb2af4ee084af742d89e7fddf7a8791a74f8c3b66782c8c9046",
             )
 
     def test_is_elf(self) -> None:

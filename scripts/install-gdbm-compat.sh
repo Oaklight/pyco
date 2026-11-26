@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PREFIX="${1:-${PYCO_CONDA_PREFIX:-${CONDA_PREFIX:-}}}"
+PREFIX="${1:-${SNUGPY_CONDA_PREFIX:-${CONDA_PREFIX:-}}}"
 
 GDBM_VERSION="1.18"
 GDBM_URL="https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz"
 GDBM_SHA256="b8822cb4769e2d759c828c06f196614936c88c141c3132b18252fe25c2b635ce"
-STAMP="${PREFIX}/.pyco-gdbm-compat-${GDBM_VERSION}"
+STAMP="${PREFIX}/.snugpy-gdbm-compat-${GDBM_VERSION}"
 
 if [[ -z "${PREFIX}" ]]; then
 	echo "usage: scripts/install-gdbm-compat.sh <conda-prefix>" >&2
@@ -28,7 +28,7 @@ if ! command -v "${CC}" >/dev/null 2>&1; then
 	exit 1
 fi
 
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/pyco-gdbm-compat.XXXXXX")"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/snugpy-gdbm-compat.XXXXXX")"
 trap 'rm -rf "${work_dir}"' EXIT
 
 echo "fetching gdbm ${GDBM_VERSION}"

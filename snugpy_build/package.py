@@ -15,7 +15,7 @@ from .config import BuildSpec
 from .distributions import load_distributions
 from .paths import BuildPaths
 from .util import (
-    PycoError,
+    SnugPyError,
     find_python,
     log,
     python_runtime_env,
@@ -27,7 +27,7 @@ from .util import (
 )
 
 
-class PackageError(PycoError):
+class PackageError(SnugPyError):
     """Raised when packaging or extraction validation fails."""
 
 
@@ -179,7 +179,7 @@ def _smoke_extracted(
     profile_cc: str,
     imports: tuple[str, ...] = ("ssl", "sqlite3", "ctypes"),
 ) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="pyco-package-") as directory:
+    with tempfile.TemporaryDirectory(prefix="snugpy-package-") as directory:
         extract_root = Path(directory)
         with tarfile.open(archive, "r:*") as handle:
             try:
@@ -240,7 +240,7 @@ def package(spec: BuildSpec, *, only: Sequence[str] | None = None) -> dict[str, 
     selected = [distributions.get(name) for name in requested]
     configured = {variant.name for variant in distributions.variants}
     base_root = (
-        f"pyco-cpython{spec.version.version}-{spec.target.name}-{spec.profile.name}"
+        f"snugpy-cpython{spec.version.version}-{spec.target.name}-{spec.profile.name}"
     )
     log(f"packaging {paths.prefix}")
     prefix_bytes = _tree_bytes(paths.prefix)
@@ -261,7 +261,7 @@ def package(spec: BuildSpec, *, only: Sequence[str] | None = None) -> dict[str, 
             archive_text = info.get("archive")
             if isinstance(archive_text, str) and Path(archive_text).is_file():
                 variants[name] = info
-    with tempfile.TemporaryDirectory(prefix="pyco-package-") as directory:
+    with tempfile.TemporaryDirectory(prefix="snugpy-package-") as directory:
         staging = Path(directory) / base_root
         shutil.copytree(
             paths.prefix,

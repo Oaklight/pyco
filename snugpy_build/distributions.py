@@ -11,12 +11,12 @@ try:
 except ModuleNotFoundError:  # Python 3.10
     import tomli as tomllib
 
-from .util import PycoError
+from .util import SnugPyError
 
 DEFAULT_DISTRIBUTION = "headless"
 
 
-class DistributionError(PycoError):
+class DistributionError(SnugPyError):
     """Raised for invalid distribution configuration."""
 
 

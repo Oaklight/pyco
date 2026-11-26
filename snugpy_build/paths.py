@@ -94,12 +94,12 @@ class BuildPaths:
         return self.package_archive_for(DEFAULT_DISTRIBUTION)
 
     def package_archive_for(self, distribution: str) -> Path:
-        release = os.environ.get("PYCO_RELEASE", __version__)
+        release = os.environ.get("SNUGPY_RELEASE", __version__)
         return (
             self.root
             / "dist"
             / (
-                f"pyco-{release}-cpython{self.version}-{self.target}-"
+                f"snugpy-{release}-cpython{self.version}-{self.target}-"
                 f"{self.profile}-{distribution}.tar.xz"
             )
         )

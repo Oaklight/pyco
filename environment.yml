@@ -1,4 +1,4 @@
-name: pyco
+name: snugpy
 channels:
   - conda-forge
   - nodefaults

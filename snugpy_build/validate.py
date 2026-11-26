@@ -15,7 +15,7 @@ from .config import BuildSpec
 from .paths import BuildPaths
 from .source import fetch_zerodep
 from .util import (
-    PycoError,
+    SnugPyError,
     copy_tree,
     find_python,
     log,
@@ -27,7 +27,7 @@ from .util import (
 )
 
 
-class ValidationError(PycoError):
+class ValidationError(SnugPyError):
     """Raised when a build cannot be validated."""
 
 
@@ -71,7 +71,7 @@ _REGRTEST_TMPDIR_BUDGET = 40  # "/test_python_XXXXXXXX/tmpXXXXXXXX/TMPDIR"
 def _regression_temp_dir() -> Path:
     """Create a short TMPDIR for the full CPython regression suite."""
 
-    tmp_dir = Path(tempfile.mkdtemp(prefix="pyco-tests-", dir="/tmp"))
+    tmp_dir = Path(tempfile.mkdtemp(prefix="snugpy-tests-", dir="/tmp"))
     path_length = (
         len(str(tmp_dir)) + _REGRTEST_TMPDIR_BUDGET + _MULTIPROCESSING_SOCKET_BUDGET
     )

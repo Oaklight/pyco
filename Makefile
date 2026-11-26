@@ -1,4 +1,4 @@
-CONDA_PREFIX ?= $(HOME)/ml_lab/envs/pyco
+CONDA_PREFIX ?= $(HOME)/ml_lab/envs/snugpy
 PYTHON ?= python3
 VERSION ?= 3.14
 TARGET ?= linux-x86_64
@@ -43,7 +43,7 @@ lock:
 
 check:
 	$(PYTHON) -m unittest discover -s tests -v
-	$(PYTHON) -m compileall -q pyco_build tests benchmarks
+	$(PYTHON) -m compileall -q snugpy_build tests benchmarks
 	command -v shellcheck >/dev/null
 	shellcheck scripts/*.sh
 	command -v shfmt >/dev/null

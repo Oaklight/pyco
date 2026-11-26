@@ -1,4 +1,4 @@
-"""Command-line interface for Pyco build orchestration."""
+"""Command-line interface for SnugPy build orchestration."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .package import package as package_cell
 from .paths import BuildPaths
 from .report import report as report_cells
 from .source import fetch_version, fetch_zerodep
-from .util import PycoError, log
+from .util import SnugPyError, log
 from .validate import validate
 
 
@@ -102,7 +102,7 @@ def _cmd_deps(config: Config, args: argparse.Namespace) -> int:
     try:
         target = config.targets[target_name]
     except KeyError:
-        raise PycoError(f"unknown target {target_name!r}") from None
+        raise SnugPyError(f"unknown target {target_name!r}") from None
     for package in target.apt_packages:
         print(package)
     return 0
@@ -123,8 +123,8 @@ def _cmd_paths(config: Config, args: argparse.Namespace) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="pyco", description=__doc__)
-    parser.add_argument("--version", action="version", version=f"pyco {__version__}")
+    parser = argparse.ArgumentParser(prog="snugpy", description=__doc__)
+    parser.add_argument("--version", action="version", version=f"snugpy {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     fetch = subparsers.add_parser(
@@ -218,7 +218,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         config = _config()
         return int(args.func(config, args))
-    except PycoError as error:
+    except SnugPyError as error:
         log(f"error: {error}")
         return 1
 

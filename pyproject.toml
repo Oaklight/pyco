@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyco-build"
+name = "snugpy"
 dynamic = ["version"]
 description = "Build and measure compact, full-compatibility CPython distributions"
 readme = "README.md"
@@ -22,17 +22,17 @@ classifiers = [
 ]
 
 [project.scripts]
-pyco = "pyco_build.cli:main"
+snugpy = "snugpy_build.cli:main"
 
 [project.urls]
-Repository = "https://github.com/Oaklight/pyco"
-Issues = "https://github.com/Oaklight/pyco/issues"
+Repository = "https://github.com/Oaklight/snugpy"
+Issues = "https://github.com/Oaklight/snugpy/issues"
 
 [tool.setuptools]
-packages = ["pyco_build"]
+packages = ["snugpy_build"]
 
 [tool.setuptools.dynamic]
-version = { attr = "pyco_build.__version__" }
+version = { attr = "snugpy_build.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

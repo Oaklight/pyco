@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PREFIX="${1:-${PYCO_CONDA_PREFIX:-${CONDA_PREFIX:-}}}"
+PREFIX="${1:-${SNUGPY_CONDA_PREFIX:-${CONDA_PREFIX:-}}}"
 LOCK_FILE="${ROOT_DIR}/conda-linux-64.lock"
 
 if [[ -z "${PREFIX}" || ! -f "${PREFIX}/conda-meta/history" ]]; then

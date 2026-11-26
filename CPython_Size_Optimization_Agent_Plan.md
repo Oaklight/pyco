@@ -1,16 +1,18 @@
-# Pyco (pronounced “pico”) — Codex Implementation Plan
+# SnugPy — Codex Implementation Plan
 
-**Status:** Implementation specification · **Updated:** 2026-11-24  
-**Project:** Pyco, a compact, full-compatibility CPython distribution  
+**Status:** Implementation specification · **Updated:** 2026-11-25  
+**Project:** SnugPy, a compact, full-compatibility CPython distribution  
 **Primary target:** Linux x86-64, CPython 3.14  
 **Next targets:** CPython 3.15 and Linux ARM64  
 **Reference application:** `https://github.com/Oaklight/zerodep`
 
-> Naming is provisional: use **Pyco** for the project and `pyco` for a future CLI; the build system must not depend on the brand name. “Pyco” may be marketed as pronounced “pico,” but English speakers may independently pronounce it “pie-co.”
+> Naming: **SnugPy** is the display name. `snugpy` is the PyPI package, CLI,
+> GitHub organization, and repository name. The build system must not depend on
+> the brand name.
 
 ## 0. Executive decisions — read first
 
-1. **One Pyco repository, one main branch, one shared build/optimization/test framework.** Do **not** maintain a separate Pyco codebase or permanent CPython fork for every Python release.
+1. **One SnugPy repository, one main branch, one shared build/optimization/test framework.** Do **not** maintain a separate SnugPy codebase or permanent CPython fork for every Python release.
 2. **Each CPython version has its own pristine upstream source checkout.** Download/verify pinned 3.14.x and (when enabled) 3.15.x sources. Build each version repeatedly under different profiles. Never share compiled objects, install prefixes, or generated configuration between builds.
 3. **Source patches are exceptional.** Common patches only when proven applicable; otherwise use `patches/3.14/` and `patches/3.15/`. Prefer upstream-compatible build flags and external tooling over interpreter modifications.
 4. **Preserve the complete, unmodified upstream standard library** (pure-Python files, data, `ensurepip`, `venv`, `idlelib`, `tkinter`, `test`, and native extensions). Do not prune or compress the stdlib as a size optimization. A missing optional extension due to build dependencies is a failed build, not a success.
@@ -31,7 +33,7 @@
 ## 2. Repository layout
 
 ```text
-pyco/
+snugpy/
 ├── .github/workflows/
 │   ├── ci.yml                 # PR/push: fast smoke matrix
 │   ├── benchmark.yml          # manual/scheduled: full matrix and measurements
@@ -42,7 +44,7 @@ pyco/
 │   ├── targets.toml           # platform and toolchain requirements
 │   ├── profiles.toml          # shared build profile definitions
 │   └── release-selection.toml # reviewed profile selection per version/arch
-├── pyco_build/                # optional Python CLI/library for orchestration
+├── snugpy_build/                # optional Python CLI/library for orchestration
 │   ├── source.py
 │   ├── profiles.py
 │   ├── build.py
@@ -120,8 +122,8 @@ Implement these commands as shell wrappers first, or as a small Python CLI if it
 ./scripts/package.sh 3.14 size linux-x86_64
 
 # Optional ergonomic facade:
-pyco build --python 3.14 --profile size --target linux-x86_64
-pyco benchmark --python 3.14 --profile all --target linux-x86_64
+snugpy build --python 3.14 --profile size --target linux-x86_64
+snugpy benchmark --python 3.14 --profile all --target linux-x86_64
 ```
 
 Canonical layout:
@@ -132,7 +134,7 @@ work/<exact-tag>/<target>/<profile>/src/   # patched working source if needed
 work/<exact-tag>/<target>/<profile>/build/ # out-of-tree build
 out/<exact-tag>/<target>/<profile>/        # installed runtime
 results/<exact-tag>/<target>/<profile>/    # metrics and logs
-dist/pyco-<release>-cpython<version>-<target>-<profile>.tar.xz
+dist/snugpy-<release>-cpython<version>-<target>-<profile>.tar.xz
 ```
 
 Use **absolute source paths** for configure, ensure `make` is run from the build directory, and ensure the installation prefix is unique. Run the newly built Python explicitly; never accidentally test `/usr/bin/python3`. Handle `LD_LIBRARY_PATH` or rpath correctly for `--enable-shared`, and verify execution after packaging/extraction in a clean location. Make scripts idempotent or fail with a clear error if a directory is dirty. Fail fast on missing tools and required native-extension dependencies.
@@ -174,7 +176,7 @@ A profile is release-eligible only if its compatibility and completeness gates p
 
 For each build capture machine-readable JSON and summary CSV with:
 
-- `cpython_version`, `cpython_tag`, `cpython_commit_or_sha256`, `pyco_commit`, `zerodep_commit`, `target`, `profile`, `toolchain`, `configure_flags`, `cflags`, `ldflags`.
+- `cpython_version`, `cpython_tag`, `cpython_commit_or_sha256`, `snugpy_commit`, `zerodep_commit`, `target`, `profile`, `toolchain`, `configure_flags`, `cflags`, `ldflags`.
 - `core_unstripped_bytes`, `core_stripped_bytes`: sum **regular unique ELF payloads** for executable and `libpython` (if present), excluding symlink duplicates.
 - `stdlib_source_data_bytes`, `native_extensions_bytes`, `installed_total_bytes`, `external_shared_libs` (list and size), `archive_bytes`, `default_distribution`, and per-variant `installed_bytes`, `archive_bytes`, and `status`.
 - Startup latency for `python -S -c pass`, normal `python -c pass`, and a representative stdlib import workload; use repeated runs with median/spread and identify cold vs warm cache semantics honestly.
@@ -223,7 +225,7 @@ Report the **Pareto frontier** for size vs startup/runtime/RSS, not only the sma
 ### Example CI skeleton (Codex must implement scripts/configs)
 
 ```yaml
-name: Pyco CI
+name: SnugPy CI
 on:
   push:
     branches: [main]
@@ -258,7 +260,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pyco-${{ matrix.python }}-${{ matrix.target }}-${{ matrix.profile }}
+          name: snugpy-${{ matrix.python }}-${{ matrix.target }}-${{ matrix.profile }}
           path: |
             results/${{ matrix.python }}/**
             dist/*.tar.xz
@@ -309,7 +311,7 @@ jobs:
 ## 10. Codex operating instructions
 
 1. Implement working code, not just workflow YAML or placeholders. Prioritize an end-to-end 3.14 baseline before generalization.
-2. Keep all Python-version logic data-driven and in one repository. Do not clone the Pyco project into per-version branches/forks.
+2. Keep all Python-version logic data-driven and in one repository. Do not clone the SnugPy project into per-version branches/forks.
 3. Do not invent source checksums, CPython release tags, benchmark results, passing tests, or GitHub workflow outcomes. If internet access is unavailable, make pins configurable and state which checks remain unverified.
 4. Preserve the complete stdlib. Never silently disable modules or bypass tests to make a build pass.
 5. Make CI and local builds invoke identical scripts. Document exact commands, prerequisites, and output paths.
@@ -319,7 +321,7 @@ jobs:
 
 ## 11. Definition of done (initial milestone)
 
-- [ ] One Pyco codebase with version-agnostic build scripts and immutable CPython source pin.
+- [ ] One SnugPy codebase with version-agnostic build scripts and immutable CPython source pin.
 - [ ] CPython 3.14 builds independently under `baseline`, `size`, `lto`, `static`, and `clang-oz` on Linux x86-64.
 - [ ] Every build has a distinct build directory, install prefix, logs, metrics, and set of distribution archives.
 - [ ] Complete stdlib is preserved in every build prefix and in the `test` distribution; `headless`/`headed` exclusions are explicit, smoke-tested, and measured separately.

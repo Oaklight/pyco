@@ -1,4 +1,4 @@
-# Pyco measurement report
+# SnugPy measurement report
 
 Generated: 2026-11-24T07:35:00Z
 

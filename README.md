@@ -1,21 +1,32 @@
-# Pyco
+# SnugPy
 
-Pyco builds compact, full-compatibility CPython distributions and measures each
-candidate against a baseline. It is build orchestration around pinned upstream
-CPython, not a CPython fork. Every profile build preserves the standard library,
-`ensurepip`, `venv`, `idlelib`, `tkinter`, `test`, and optional native
-extensions. Packaging then derives three deployable variants from the same
-stripped tree: a compact `headless` runtime, a `headed` runtime with Tk/IDLE,
-and a complete `test` distribution.
+**Whole Python. Small footprint.**
+
+SnugPy builds compact, deployable Python runtimes and measures each candidate
+against a full CPython baseline. It starts from pinned upstream CPython rather
+than reimplementing the language, so compatibility comes first. Every profile
+build preserves the standard library, `ensurepip`, `venv`, `idlelib`, `tkinter`,
+`test`, and optional native extensions. Packaging then derives three deployable
+variants from the same stripped tree: a compact `headless` runtime, a `headed`
+runtime with Tk/IDLE, and a complete `test` distribution.
 
 **Status:** experimental. The build and measurement framework is implemented,
-but no release profile has been approved. No CPython build has been verified in
-the development checkout yet; GitHub Actions is the build and verification path.
+but no release profile has been approved. GitHub Actions is the build and
+verification path.
+
+## Origin
+
+SnugPy started from the same observation as MicroPython and PocketPy: most
+deployments do not need the full CPython source tree or every development
+artifact. Unlike those projects, SnugPy starts from CPython to keep full
+compatibility, then removes deployment-irrelevant parts. Future work may modify
+the interpreter more aggressively; the name does not promise an unmodified
+CPython.
 
 ## Version policy
 
-The compatibility floor for the Pyco tooling and for `zerodep` is Python 3.10.
-That does **not** mean Pyco must build or distribute CPython 3.10, 3.11, 3.12,
+The compatibility floor for the SnugPy tooling and for `zerodep` is Python 3.10.
+That does **not** mean SnugPy must build or distribute CPython 3.10, 3.11, 3.12,
 and 3.13. CPython has a different ABI in each minor release. The initial target
 is one pinned CPython 3.14 maintenance release. A future version is added as its
 own pinned source, build matrix, and release decision; compiled objects,
@@ -28,14 +39,14 @@ Clang 23, `lld`, binutils, `patchelf`, `hyperfine`, GNU `time`, ShellCheck,
 `go-shfmt`, and the libraries needed by CPython's optional extensions.
 
 ```bash
-git clone git@github.com:Oaklight/pyco.git
-cd pyco
+git clone git@github.com:Oaklight/snugpy.git
+cd snugpy
 
 # New prefixes are created from the exact lock file when it exists.
-./scripts/setup-conda.sh "$HOME/ml_lab/envs/pyco"
+./scripts/setup-conda.sh "$HOME/ml_lab/envs/snugpy"
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate "$HOME/ml_lab/envs/pyco"
+conda activate "$HOME/ml_lab/envs/snugpy"
 
 ./scripts/check-deps.sh
 ./scripts/fetch.sh 3.14 --zerodep
@@ -48,7 +59,7 @@ conda activate "$HOME/ml_lab/envs/pyco"
 
 `scripts/setup-conda.sh` prefers `conda-linux-64.lock` for a new prefix. It
 falls back to `environment.yml`, and it updates an existing prefix from
-`environment.yml`. Set `PYCO_CONDA_USE_LOCK=0` to force the YAML path.
+`environment.yml`. Set `SNUGPY_CONDA_USE_LOCK=0` to force the YAML path.
 
 `scripts/package.sh` copies the install prefix once, strips debug symbols from
 ELF binaries, relocatable objects, and static archives in the staging tree, and
@@ -61,12 +72,12 @@ flags select several.
 To use the environment without activating it, which is how CI runs builds:
 
 ```bash
-export PYCO_CONDA_PREFIX="$HOME/ml_lab/envs/pyco"
-export PATH="$PYCO_CONDA_PREFIX/bin:$PATH"
+export SNUGPY_CONDA_PREFIX="$HOME/ml_lab/envs/snugpy"
+export PATH="$SNUGPY_CONDA_PREFIX/bin:$PATH"
 ```
 
-`PYCO_CONDA_PREFIX` takes precedence over `CONDA_PREFIX`. Conda activation
-exports optimized and hardened `CFLAGS`, `CPPFLAGS`, and `LDFLAGS`; Pyco
+`SNUGPY_CONDA_PREFIX` takes precedence over `CONDA_PREFIX`. Conda activation
+exports optimized and hardened `CFLAGS`, `CPPFLAGS`, and `LDFLAGS`; SnugPy
 discards those values and supplies only the selected profile flags plus the
 conda include and library paths. This keeps `baseline` and the size profiles
 comparable.
@@ -74,7 +85,7 @@ comparable.
 Regenerate the lock after an intentional environment change:
 
 ```bash
-./scripts/lock-conda.sh "$HOME/ml_lab/envs/pyco"
+./scripts/lock-conda.sh "$HOME/ml_lab/envs/snugpy"
 ```
 
 ## Profiles
@@ -112,7 +123,7 @@ variant. Edit `configs/distributions.toml` to change the variants; the default
 distribution is `headless`.
 
 Variant names are appended to archive filenames, for example
-`pyco-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`. The package
+`snugpy-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`. The package
 metadata keeps one entry per variant. The report matrix uses the default
 distribution and lists every variant's installed and archive size separately.
 
@@ -135,7 +146,7 @@ distribution and lists every variant's installed and archive size separately.
 | `make clean` | Remove `work/`, `out/`, and `dist/` |
 
 The direct scripts accept `VERSION`, `TARGET`, and `PROFILE` as positional
-arguments. Use `python -m pyco_build.cli list` to see the configured values.
+arguments. Use `python -m snugpy_build.cli list` to see the configured values.
 
 ## Pins
 
@@ -165,7 +176,7 @@ setup step builds `libgdbm_compat` from pinned GDBM `1.18` source so both
 
 ```text
 configs/        immutable versions, targets, profiles, release decisions
-pyco_build/     CLI, source verification, build, validation, metrics, packaging
+snugpy_build/     CLI, source verification, build, validation, metrics, packaging
 scripts/        shell entry points and conda environment setup
 tests/          unit tests, runtime smoke test, C ABI smoke module
 benchmarks/     CPU and I/O workloads

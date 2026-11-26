@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime smoke checks for a built Pyco interpreter."""
+"""Runtime smoke checks for a built SnugPy interpreter."""
 
 from __future__ import annotations
 
@@ -83,12 +83,12 @@ def check_subprocess() -> None:
     """Run a child interpreter and read its output."""
 
     result = subprocess.run(
-        [sys.executable, "-c", "print('pyco-child-ok')"],
+        [sys.executable, "-c", "print('snugpy-child-ok')"],
         check=True,
         capture_output=True,
         text=True,
     )
-    if result.stdout.strip() != "pyco-child-ok":
+    if result.stdout.strip() != "snugpy-child-ok":
         raise RuntimeError(f"subprocess output mismatch: {result.stdout!r}")
 
 
@@ -146,10 +146,10 @@ def check_ssl() -> None:
 def check_filesystem() -> None:
     """Exercise filesystem writes, reads, and temp files."""
 
-    with tempfile.TemporaryDirectory(prefix="pyco-smoke-") as directory:
+    with tempfile.TemporaryDirectory(prefix="snugpy-smoke-") as directory:
         path = Path(directory) / "payload.txt"
-        path.write_text("pyco", encoding="utf-8")
-        if path.read_text(encoding="utf-8") != "pyco":
+        path.write_text("snugpy", encoding="utf-8")
+        if path.read_text(encoding="utf-8") != "snugpy":
             raise RuntimeError("filesystem round trip failed")
         os.replace(path, Path(directory) / "moved.txt")
         if not (Path(directory) / "moved.txt").exists():
@@ -161,7 +161,7 @@ def check_dbm() -> None:
 
     import dbm.ndbm
 
-    with tempfile.TemporaryDirectory(prefix="pyco-dbm-") as directory:
+    with tempfile.TemporaryDirectory(prefix="snugpy-dbm-") as directory:
         path = Path(directory) / "records"
         with dbm.ndbm.open(str(path), "c") as database:
             database[b"key"] = b"value"

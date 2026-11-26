@@ -16,7 +16,7 @@ from .config import BuildSpec
 from .paths import BuildPaths
 from .source import verify_source
 from .util import (
-    PycoError,
+    SnugPyError,
     copy_tree,
     find_python,
     is_elf,
@@ -42,7 +42,7 @@ DRY_RUN_ENV_KEYS = (
 )
 
 
-class BuildError(PycoError):
+class BuildError(SnugPyError):
     """Raised when a build cannot be completed."""
 
 

@@ -17,11 +17,11 @@ from pathlib import Path
 from typing import Callable, Iterator, Mapping, Sequence
 
 
-class PycoError(RuntimeError):
-    """Base error for expected Pyco failures."""
+class SnugPyError(RuntimeError):
+    """Base error for expected SnugPy failures."""
 
 
-class CommandError(PycoError):
+class CommandError(SnugPyError):
     """Raised when a subprocess exits non-zero."""
 
     def __init__(self, result: "CommandResult") -> None:
@@ -55,7 +55,7 @@ def utc_now() -> str:
 def log(message: str) -> None:
     """Write a progress message to standard error."""
 
-    print(f"[pyco] {message}", file=sys.stderr, flush=True)
+    print(f"[snugpy] {message}", file=sys.stderr, flush=True)
 
 
 def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
@@ -243,7 +243,7 @@ def run_command(
         except subprocess.TimeoutExpired:
             process.kill()
             returncode = process.wait()
-            lines.append(f"\n[pyco] command timed out after {timeout} seconds\n")
+            lines.append(f"\n[snugpy] command timed out after {timeout} seconds\n")
     finally:
         if handle is not None:
             handle.close()
@@ -273,7 +273,7 @@ def find_python(prefix: Path, version: str) -> Path:
     for candidate in candidates:
         if candidate.exists():
             return candidate.resolve()
-    raise PycoError(f"no interpreter found under {prefix}/bin")
+    raise SnugPyError(f"no interpreter found under {prefix}/bin")
 
 
 def python_runtime_env(prefix: Path) -> dict[str, str]:
@@ -283,7 +283,7 @@ def python_runtime_env(prefix: Path) -> dict[str, str]:
     lib_dir = str(prefix / "lib")
     bin_dir = str(prefix / "bin")
     library_paths = [lib_dir]
-    conda_prefix = env.get("PYCO_CONDA_PREFIX") or env.get("CONDA_PREFIX")
+    conda_prefix = env.get("SNUGPY_CONDA_PREFIX") or env.get("CONDA_PREFIX")
     if conda_prefix:
         conda_lib_dir = str(Path(conda_prefix) / "lib")
         if conda_lib_dir != lib_dir:

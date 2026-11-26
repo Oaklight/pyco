@@ -13,13 +13,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .profiles import ProfileError, ProfileSpec, load_profiles, resolve_profile
-from .util import PycoError
+from .util import SnugPyError
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
-class ConfigError(PycoError):
+class ConfigError(SnugPyError):
     """Raised for invalid repository configuration."""
 
 

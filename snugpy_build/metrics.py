@@ -17,7 +17,7 @@ from .config import BuildSpec, Config
 from .distributions import DEFAULT_DISTRIBUTION
 from .paths import BuildPaths
 from .util import (
-    PycoError,
+    SnugPyError,
     find_python,
     git_commit,
     is_elf,
@@ -32,7 +32,7 @@ from .util import (
 )
 
 
-class MetricsError(PycoError):
+class MetricsError(SnugPyError):
     """Raised when measurement cannot be completed."""
 
 
@@ -134,7 +134,7 @@ def _strip_copy(core_files: list[Path]) -> tuple[int | None, str | None]:
         return None, "strip not found"
     total = 0
     try:
-        with tempfile.TemporaryDirectory(prefix="pyco-strip-") as directory:
+        with tempfile.TemporaryDirectory(prefix="snugpy-strip-") as directory:
             for index, path in enumerate(core_files):
                 if not is_elf(path):
                     continue
@@ -475,7 +475,7 @@ def measure(
         "cpython_tag": spec.version.tag,
         "cpython_commit_or_sha256": spec.version.git_commit,
         "cpython_sha256": spec.version.sha256,
-        "pyco_commit": git_commit(spec.root),
+        "snugpy_commit": git_commit(spec.root),
         "zerodep_commit": config.zerodep.commit,
         "target": spec.target.name,
         "profile": spec.profile.name,

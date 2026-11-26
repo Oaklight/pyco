@@ -13,7 +13,7 @@ from typing import Any
 from .config import Config, VersionPin
 from .paths import BuildPaths
 from .util import (
-    PycoError,
+    SnugPyError,
     log,
     read_json,
     remove_tree,
@@ -24,7 +24,7 @@ from .util import (
 )
 
 
-class SourceError(PycoError):
+class SourceError(SnugPyError):
     """Raised when source acquisition or verification fails."""
 
 
@@ -68,7 +68,7 @@ def _download(url: str, destination: Path, expected_sha256: str, force: bool) ->
     if temporary.exists():
         temporary.unlink()
     log(f"downloading {url}")
-    request = urllib.request.Request(url, headers={"User-Agent": "pyco-build/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "snugpy/0.1"})
     try:
         with (
             urllib.request.urlopen(request, timeout=120) as response,
@@ -187,7 +187,7 @@ def fetch_version(spec: Any, force: bool = False) -> BuildPaths:
     _download(pin.url, paths.archive, pin.sha256, force=force)
 
     with tempfile.TemporaryDirectory(
-        prefix="pyco-source-", dir=str(paths.root / "sources")
+        prefix="snugpy-source-", dir=str(paths.root / "sources")
     ) as tmp_name:
         tmp = Path(tmp_name)
         _safe_extract(paths.archive, tmp)
@@ -246,7 +246,7 @@ def fetch_zerodep(config: Config, force: bool = False) -> Path:
                 return destination
 
     temporary = Path(
-        tempfile.mkdtemp(prefix="pyco-zerodep-", dir=str(config.root / "sources"))
+        tempfile.mkdtemp(prefix="snugpy-zerodep-", dir=str(config.root / "sources"))
     )
     remove_tree(temporary)
     log(f"cloning zerodep {pin.tag} ({pin.commit})")
