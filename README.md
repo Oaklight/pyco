@@ -206,5 +206,9 @@ pass.
 
 ## License
 
-No license has been selected. Add a license before distributing or accepting
-external contributions.
+SnugPy is licensed under the MIT License. See `LICENSE`.
+
+A distribution archive also contains CPython-derived files. CPython keeps its
+own PSF License Agreement, which is included in every archive at
+`licenses/CPython-PSF-LICENSE.txt`. Third-party components are listed in
+`THIRD_PARTY_LICENSES.md`.

@@ -35,6 +35,14 @@ _ET_REL = 1
 _ET_EXEC = 2
 _ET_DYN = 3
 
+_ROOT_LICENSE_FILES = ("LICENSE", "THIRD_PARTY_LICENSES.md")
+_LICENSE_DIR = "licenses"
+_REQUIRED_LICENSE_FILES = (
+    "LICENSE",
+    "THIRD_PARTY_LICENSES.md",
+    "licenses/CPython-PSF-LICENSE.txt",
+)
+
 
 def _elf_type(path: Path) -> int | None:
     """Return the ELF e_type value, or None for non-ELF files."""
@@ -133,6 +141,42 @@ def _add_entry(tar: tarfile.TarFile, path: Path, arcname: str, epoch: int) -> No
         tar.addfile(info)
 
 
+def _install_license_files(staging: Path, root: Path, source: Path) -> list[str]:
+    """Copy licensing files into the staged install tree."""
+
+    installed: list[str] = []
+    for name in _ROOT_LICENSE_FILES:
+        path = root / name
+        if not path.is_file():
+            raise PackageError(f"license file missing: {path}")
+        shutil.copy2(path, staging / name)
+        installed.append(name)
+    destination = staging / _LICENSE_DIR
+    destination.mkdir(parents=True, exist_ok=True)
+    for path in sorted((root / _LICENSE_DIR).glob("*")):
+        if path.is_file():
+            shutil.copy2(path, destination / path.name)
+            installed.append(f"{_LICENSE_DIR}/{path.name}")
+    overrides = {
+        source / "LICENSE": destination / "CPython-PSF-LICENSE.txt",
+        source / "Doc" / "license.rst": (
+            destination / "CPython-third-party-licenses.rst"
+        ),
+    }
+    for path, target in overrides.items():
+        if path.is_file():
+            shutil.copy2(path, target)
+            installed.append(f"{_LICENSE_DIR}/{target.name}")
+    missing = [
+        name for name in _REQUIRED_LICENSE_FILES if not (staging / name).is_file()
+    ]
+    if missing:
+        raise PackageError(
+            "staged distribution is missing license files: " + ", ".join(missing)
+        )
+    return list(dict.fromkeys(installed))
+
+
 def _build_archive(
     prefix: Path,
     archive: Path,
@@ -190,6 +234,15 @@ def _smoke_extracted(
         if len(entries) != 1 or not entries[0].is_dir():
             raise PackageError("archive does not contain exactly one root directory")
         runtime_root = entries[0]
+        missing_licenses = [
+            name
+            for name in _REQUIRED_LICENSE_FILES
+            if not (runtime_root / name).is_file()
+        ]
+        if missing_licenses:
+            raise PackageError(
+                "archive is missing license files: " + ", ".join(missing_licenses)
+            )
         python = find_python(runtime_root, version)
         if imports:
             code = f"import {', '.join(imports)}; print('package-ok')"
@@ -269,6 +322,8 @@ def package(spec: BuildSpec, *, only: Sequence[str] | None = None) -> dict[str, 
             symlinks=True,
             copy_function=shutil.copy2,
         )
+        license_files = _install_license_files(staging, paths.root, paths.source)
+        log(f"installed {len(license_files)} license files")
         strip = _strip_tree(staging)
         log(f"stripped {strip['files']} ELF files: {strip['bytes_saved']} bytes saved")
         for variant in selected:
@@ -312,6 +367,7 @@ def package(spec: BuildSpec, *, only: Sequence[str] | None = None) -> dict[str, 
         "default_distribution": default_name,
         "source_installed_bytes": prefix_bytes,
         "strip": strip,
+        "licenses": license_files,
         "variants": variants,
         "created_at": utc_now(),
     }

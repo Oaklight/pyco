@@ -26,7 +26,12 @@ from snugpy_build.metrics import (  # noqa: E402
     _distribution_metrics,
     _parse_hyperfine,
 )
-from snugpy_build.package import _build_archive, _elf_type  # noqa: E402
+from snugpy_build.package import (  # noqa: E402
+    PackageError,
+    _build_archive,
+    _elf_type,
+    _install_license_files,
+)
 from snugpy_build.paths import BuildPaths  # noqa: E402
 from snugpy_build.report import _row, _write_report  # noqa: E402
 from snugpy_build.source import SourceError, _safe_extract  # noqa: E402
@@ -335,6 +340,57 @@ class PackageTests(unittest.TestCase):
                 names = archive.getnames()
             self.assertIn("snugpy-root/lib/python3.14/json/__init__.py", names)
             self.assertNotIn("snugpy-root/lib/python3.14/test/test_abc.py", names)
+
+    def test_license_files_are_staged_from_project_and_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            (project / "licenses").mkdir(parents=True)
+            (project / "LICENSE").write_text("mit\n", encoding="utf-8")
+            (project / "THIRD_PARTY_LICENSES.md").write_text(
+                "third-party\n", encoding="utf-8"
+            )
+            (project / "licenses" / "CPython-PSF-LICENSE.txt").write_text(
+                "vendored\n", encoding="utf-8"
+            )
+            source = root / "source"
+            (source / "Doc").mkdir(parents=True)
+            (source / "LICENSE").write_text("psf\n", encoding="utf-8")
+            (source / "Doc" / "license.rst").write_text("inventory\n", encoding="utf-8")
+            staging = root / "staging"
+            staging.mkdir()
+
+            installed = _install_license_files(staging, project, source)
+
+            self.assertEqual((staging / "LICENSE").read_text(), "mit\n")
+            self.assertEqual(
+                (staging / "THIRD_PARTY_LICENSES.md").read_text(),
+                "third-party\n",
+            )
+            self.assertEqual(
+                (staging / "licenses" / "CPython-PSF-LICENSE.txt").read_text(),
+                "psf\n",
+            )
+            self.assertEqual(
+                (staging / "licenses" / "CPython-third-party-licenses.rst").read_text(),
+                "inventory\n",
+            )
+            self.assertEqual(len(installed), len(set(installed)))
+
+    def test_missing_license_inventory_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "project"
+            (project / "licenses").mkdir(parents=True)
+            (project / "LICENSE").write_text("mit\n", encoding="utf-8")
+            (project / "licenses" / "CPython-PSF-LICENSE.txt").write_text(
+                "psf\n", encoding="utf-8"
+            )
+            staging = root / "staging"
+            staging.mkdir()
+
+            with self.assertRaises(PackageError):
+                _install_license_files(staging, project, root / "source")
 
 
 class AccountingTests(unittest.TestCase):
