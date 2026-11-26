@@ -4,7 +4,11 @@ set -euo pipefail
 PREFIX="${1:-${SNUGPY_CONDA_PREFIX:-${CONDA_PREFIX:-}}}"
 
 GDBM_VERSION="1.18"
-GDBM_URL="https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz"
+GDBM_URLS=(
+	"https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz"
+	"https://ftpmirror.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz"
+	"https://mirrors.kernel.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz"
+)
 GDBM_SHA256="b8822cb4769e2d759c828c06f196614936c88c141c3132b18252fe25c2b635ce"
 STAMP="${PREFIX}/.snugpy-gdbm-compat-${GDBM_VERSION}"
 
@@ -31,12 +35,23 @@ fi
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/snugpy-gdbm-compat.XXXXXX")"
 trap 'rm -rf "${work_dir}"' EXIT
 
-echo "fetching gdbm ${GDBM_VERSION}"
-curl --fail --location --silent --show-error "${GDBM_URL}" \
-	-o "${work_dir}/gdbm-${GDBM_VERSION}.tar.gz"
-echo "${GDBM_SHA256}  ${work_dir}/gdbm-${GDBM_VERSION}.tar.gz" |
-	sha256sum --check --status
-tar -xzf "${work_dir}/gdbm-${GDBM_VERSION}.tar.gz" -C "${work_dir}"
+archive="${work_dir}/gdbm-${GDBM_VERSION}.tar.gz"
+downloaded=0
+for url in "${GDBM_URLS[@]}"; do
+	echo "fetching gdbm ${GDBM_VERSION} from ${url}"
+	if curl --fail --location --silent --show-error \
+		--connect-timeout 15 --retry 2 --retry-delay 2 \
+		"${url}" -o "${archive}"; then
+		downloaded=1
+		break
+	fi
+done
+if [[ "${downloaded}" -ne 1 ]]; then
+	echo "could not download gdbm ${GDBM_VERSION}" >&2
+	exit 1
+fi
+echo "${GDBM_SHA256}  ${archive}" | sha256sum --check --status
+tar -xzf "${archive}" -C "${work_dir}"
 
 build_dir="${work_dir}/gdbm-${GDBM_VERSION}"
 echo "building libgdbm_compat against ${PREFIX}"
