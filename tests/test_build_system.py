@@ -134,6 +134,16 @@ class DistributionTests(unittest.TestCase):
             headless.matches_exclude("lib/python3.14/config-3.14-x86_64/python.o")
         )
         self.assertTrue(headless.matches_exclude("lib/libpython3.14.a"))
+        self.assertTrue(
+            headless.matches_exclude(
+                "lib/python3.14/lib-dynload/_testcapi.cpython-314-x86_64-linux-gnu.so"
+            )
+        )
+        self.assertFalse(
+            headless.matches_exclude(
+                "lib/python3.14/lib-dynload/math.cpython-314-x86_64-linux-gnu.so"
+            )
+        )
         self.assertFalse(headless.matches_exclude("lib/python3.14/json/__init__.py"))
         self.assertFalse(
             headless.matches_exclude("lib/python3.14/site-packages/test_helper.py")

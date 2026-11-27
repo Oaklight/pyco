@@ -8,6 +8,11 @@ exclude = [
   "lib/python*/idlelib",
   "lib/python*/tkinter",
   "lib/python*/lib-dynload/_tkinter*",
+  "lib/python*/lib-dynload/_test*",
+  "lib/python*/lib-dynload/_ctypes_test*",
+  "lib/python*/lib-dynload/xxlimited*",
+  "lib/python*/lib-dynload/xxsubtype*",
+  "lib/python*/lib-dynload/_xxtestfuzz*",
   "lib/python*/config-*/libpython*.a",
   "lib/libpython*.a",
   "lib/python*/config-*/python.o",
@@ -19,6 +24,11 @@ smoke_imports = ["ssl", "sqlite3", "ctypes"]
 description = "Runtime with IDLE and Tk GUI support, without tests or development archives."
 exclude = [
   "lib/python*/test",
+  "lib/python*/lib-dynload/_test*",
+  "lib/python*/lib-dynload/_ctypes_test*",
+  "lib/python*/lib-dynload/xxlimited*",
+  "lib/python*/lib-dynload/xxsubtype*",
+  "lib/python*/lib-dynload/_xxtestfuzz*",
   "lib/python*/config-*/libpython*.a",
   "lib/libpython*.a",
   "lib/python*/config-*/python.o",
