@@ -170,7 +170,7 @@ jobs:
           done < <(find results -type f -path '*/logs/*.log' -print0)
           while IFS= read -r -d '' config_log; do
             echo "===== ${config_log}"
-            sed -n '1,220p' "${config_log}"
+            sed -n '220,380p' "${config_log}"
           done < <(find work -name config.log -print0 2>/dev/null)
       - name: Upload profile results
         if: always()
@@ -182,6 +182,7 @@ jobs:
           path: |
             results/**/*.json
             results/**/logs/*.log
+            work/**/build/config.log
             dist/*.tar.xz
 
   runtime-image:
