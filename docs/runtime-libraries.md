@@ -1,11 +1,12 @@
 # Runtime external libraries
 
-SnugPy does not bundle external C libraries. The interpreter core links only the
-C runtime, `libm`, and the dynamic loader. Optional native extensions load their
-libraries by soname. The runtime image must provide those sonames.
+SnugPy distribution archives do not bundle external C libraries. The interpreter
+core links only the C runtime, `libm`, and the dynamic loader. Optional native
+extensions load their libraries by soname. The runtime image must provide those
+sonames.
 
 This page records the two link environments, the `static-lean` ABI gate, the
-measured dependency inventory, and the runtime image strategy.
+measured dependency inventory, and the three runtime image strategies.
 
 ## Two link environments
 
@@ -85,10 +86,10 @@ inside `debian:bookworm-slim`. Symlinks are resolved to their real files.
 | --- | ---: | --- | --- |
 | `libcrypto.so.3` | 4,742,424 | `libssl3` | `_ssl`, `_hashlib` |
 | `libsqlite3.so.0` | 1,437,848 | `libsqlite3-0` | `_sqlite3` |
-| `libzstd.so.1` | 763,816 | `libzstd1` | `_zstd`, OpenSSL |
+| `libzstd.so.1` | 763,816 | `libzstd1` | `_zstd` |
 | `libssl.so.3` | 688,160 | `libssl3` | `_ssl` |
 | `liblzma.so.5` | 190,456 | `liblzma5` | `_lzma` |
-| `libz.so.1` | 121,280 | `zlib1g` | `zlib`, `binascii`, OpenSSL |
+| `libz.so.1` | 121,280 | `zlib1g` | `zlib`, `binascii` |
 | `libbz2.so.1.0` | 74,688 | `libbz2-1.0` | `_bz2` |
 | `libffi.so.8` | 43,480 | `libffi8` | `_ctypes` |
 | `libuuid.so.1` | 34,872 | `libuuid1` | `_uuid` |
@@ -97,13 +98,22 @@ Optional libraries total 8,097,024 bytes. `libcrypto` is 59% of that total.
 `libc.so.6`, `libm.so.6`, and `ld-linux-x86-64.so.2` come from `libc6` and are
 always present in a glibc base image.
 
-Debian's OpenSSL 3.0 links zstd but not brotli. The Ubuntu 24.04 conda OpenSSL
-also pulled brotli, which added about 1 MiB. Debian 12 avoids that chain.
+Debian 12 OpenSSL 3.0 does not depend on brotli. The conda-forge OpenSSL used
+by the comparison profiles also pulled brotli, which added about 1 MiB. The
+Debian-based deployment path avoids that dependency.
 
 ## Runtime image strategy
 
-SnugPy has two runtime Dockerfiles. Both use `runtime`, keep `site-packages`,
-and run the same `ssl`, `sqlite3`, `ctypes`, `json`, and `asyncio` smoke test.
+SnugPy has three runtime Dockerfiles. All use the `static-lean` profile and run
+the same module and SQLite smoke test. The Debian slim and distroless images use
+`runtime`. The scratch image can use either `runtime` or `runtime-nano`.
+
+| Image | Distribution | Final bytes | MiB | Shell | Package manager |
+| --- | --- | ---: | ---: | --- | --- |
+| Debian slim | `runtime` | 129,918,089 | 123.90 | yes | apt |
+| Distroless | `runtime` | 73,808,996 | 70.39 | no | no |
+| Scratch | `runtime` | 63,730,573 | 60.78 | no | no |
+| Scratch | `runtime-nano` | 33,484,721 | 31.93 | no | no |
 
 ### Debian slim
 
@@ -124,10 +134,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ${PACKAGES} ...
 COPY --from=unpack /opt/snugpy /opt/snugpy
 ```
 
-The final image does not include the unpack stage. This matters: `ADD` followed
-by `RUN mv` in one stage leaves two copies in the image. The old single-stage
-Dockerfile measured 177,391,776 bytes. The multi-stage Dockerfile measures
-130,681,569 bytes, a reduction of 46,710,207 bytes or 26.3%.
+The final image does not include the unpack stage. `ADD` followed by `RUN mv` in
+one stage leaves two copies in the image. The old single-stage Dockerfile
+measured 177,391,776 bytes. The current multi-stage image measures 129,918,089
+bytes, a reduction of 47,473,687 bytes or 26.8%.
 
 ### Distroless
 
@@ -152,38 +162,70 @@ The image runs as the distroless `nonroot` user, UID 65532.
 | Component | Bytes |
 | --- | ---: |
 | `gcr.io/distroless/cc-debian12:nonroot` base | 23,667,617 |
-| SnugPy `runtime` installation | 47,583,622 |
-| Copied libraries and layer overhead | 2,557,131 |
-| Final distroless image | 73,808,370 |
+| SnugPy `runtime` installation | 47,474,939 |
+| Copied libraries and layer overhead | 2,666,440 |
+| Final distroless image | 73,808,996 |
 
-The distroless image is 56,873,199 bytes smaller than the Debian slim image, a
-43.5% reduction. It is 58.4% smaller than the original single-stage image.
+The distroless image is 56,109,093 bytes smaller than the Debian slim image, a
+43.2% reduction. It is 58.4% smaller than the original single-stage image.
 
-Verified inside the image:
+CI runs the module and SQLite smoke test inside the image. A separate local
+check also passed HTTPS, numpy 2.5.5, and pandas 3.1.1.
+
+### Scratch
+
+`docker/runtime-scratch.Dockerfile` assembles the final image `FROM scratch`.
+A Debian builder stage copies only:
+
+- the dynamic loader, `libc`, `libm`, `libmvec`, `libgcc_s`, and `libstdc++`
+- OpenSSL, SQLite, zlib, zstd, bz2, lzma, libffi, and libuuid
+- NSS resolver files and `/etc/nsswitch.conf`
+- the CA certificate bundle and OpenSSL configuration
+- full tzdata
+- `/etc/passwd`, `/etc/group`, `/tmp`, and `/home/nonroot`
+
+The final image has no shell, package manager, compiler, userland utilities, or
+distribution metadata. It runs as UID 65532.
+
+| Distribution | SnugPy installation | Root filesystem | Final image |
+| --- | ---: | ---: | ---: |
+| `runtime` | 47,474,939 | 16,255,634 | 63,730,573 |
+| `runtime-nano` | 17,229,087 | 16,255,634 | 33,484,721 |
+
+The scratch root filesystem costs 16,255,634 bytes. The installed Python tree
+determines the remaining size, so `runtime-nano` is the minimum image for an
+agent sandbox that needs preinstalled packages.
+
+Scratch `runtime` is 10,078,423 bytes smaller than distroless `runtime`, a 13.7%
+reduction. Scratch `runtime-nano` is 40,324,275 bytes smaller than distroless
+`runtime`, a 54.6% reduction. It is 96,433,368 bytes smaller than the Debian
+slim `runtime` image, a 74.2% reduction.
+
+Local verification inside the scratch image passed:
 
 ```text
 runtime-ok
-ssl OpenSSL 3.0.20
+OpenSSL 3.0.22
+TLSv1.3
+dns <resolved address>
+tz America/New_York
+uid 65532 nonroot
 sqlite 1
-https 200
+numpy 2.5.5
+pandas 3.1.1
+{'a': 3}
 ```
 
-The smoke test covers `ssl`, `sqlite3` writes, `ctypes`, `json`, `asyncio`,
-`bz2`, `lzma`, `zlib`, `uuid`, and `hashlib`, plus an HTTPS request.
-
-### Comparison
-
-| Image | Base bytes | Final bytes | Shell | Package manager |
-| --- | ---: | ---: | --- | --- |
-| Debian slim | 74,867,382 | 130,681,569 | yes | apt |
-| Distroless | 23,667,617 | 73,808,370 | no | no |
+The CI smoke test imports `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio`, `bz2`,
+`hashlib`, `lzma`, `uuid`, `zlib`, and `zoneinfo`, then runs an SQLite query.
+DNS, HTTPS, and numpy/pandas were separate local checks, not CI gates.
 
 `scripts/image-size.sh` selects the Dockerfile with `IMAGE_DOCKERFILE`:
 
 ```bash
-IMAGE_DOCKERFILE=docker/runtime-distroless.Dockerfile \
+IMAGE_DOCKERFILE=docker/runtime-scratch.Dockerfile \
   ./scripts/image-size.sh 3.14 static-lean linux-x86_64 \
-    gcr.io/distroless/cc-debian12:nonroot runtime
+    debian:bookworm-slim runtime-nano
 ```
 
 ## Next options
@@ -195,8 +237,10 @@ IMAGE_DOCKERFILE=docker/runtime-distroless.Dockerfile \
   the 1.4 MiB system dependency and may shrink the total, at the cost of a
   build-time SQLite pin.
 - Minimal OpenSSL: build a pinned OpenSSL without legacy providers, engines,
-  tests, docs, zstd, or brotli. Bundle it only if a target base image cannot
-  provide a compatible OpenSSL.
+  tests, docs, zstd, or brotli. The current Debian `libcrypto` is 4.7 MiB and
+  dominates the external-library footprint.
+- Reduced tzdata: keep only the zones required by the deployment. Full tzdata
+  costs about 1.3 MiB.
 - Pinned base images: record the Debian and distroless digests next to the
   archive hash so both images are reproducible.
 
@@ -205,4 +249,7 @@ Remeasure after every change:
 ```bash
 ./scripts/image-size.sh 3.14 static-lean linux-x86_64 \
   debian:bookworm-slim runtime
+IMAGE_DOCKERFILE=docker/runtime-scratch.Dockerfile \
+  ./scripts/image-size.sh 3.14 static-lean linux-x86_64 \
+  debian:bookworm-slim runtime-nano
 ```

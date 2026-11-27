@@ -130,7 +130,7 @@ stay consistent.
 | `headed` | tests, test-only extensions, development archives and objects | `ssl`, `sqlite3`, `ctypes`, `tkinter` | Workstations that need Tk/IDLE |
 | `test` | nothing | `ssl`, `sqlite3`, `ctypes`, `test` | Compatibility testing and redistribution analysis |
 | `micro` | installer, docs, tests, headers, development files, Tk, curses, dbm, readline | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Stdlib-only agent sandboxes |
-| `nano` | `micro` plus `__pycache__` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Smallest image; imports compile from source |
+| `nano` | `micro` plus `__pycache__` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Smallest stdlib-only image; imports compile from source |
 | `runtime` | `micro` minus installer, keeps `site-packages` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Agent sandboxes with preinstalled packages |
 | `runtime-nano` | `runtime` plus no `__pycache__` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Smallest agent sandbox with preinstalled packages |
 
@@ -154,7 +154,7 @@ Three runtime Dockerfiles are provided:
 - `docker/runtime-scratch.Dockerfile`: `scratch` root filesystem with only the
   required sonames, CA certificates, tzdata, NSS files, and runtime directories.
 
-The scratch image with `runtime-nano` measured 33,484,095 bytes locally, about
+The scratch image with `runtime-nano` measured 33,484,721 bytes in CI, about
 32 MiB. It keeps the standard library, HTTPS, SQLite, `ctypes`, compression
 modules, time zones, and `site-packages`. Edit `configs/distributions.toml` to
 change the variants; the default distribution is `headless`.

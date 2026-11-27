@@ -6,11 +6,11 @@ version is a separate build matrix, not a configuration switch.
 
 Snapshot source:
 
-- CI run `45936972209` on `main`, commit `483087e`
+- Profile and image metrics: CI run `45948508874` on `main`, commit `39329e3`
 - CPython `3.14.9`
 - Target `linux-x86_64`
 - Profiles: seven
-- Distributions: six per profile
+- Distributions: seven per profile
 
 ## Supported Python versions
 
@@ -46,13 +46,13 @@ warm-cache `python -c pass` time. RSS is the peak for the same command.
 
 | Profile | Core stripped | Core vs baseline | Headless installed | Headless archive | Startup | RSS |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `baseline` | 6,384,032 | +0.00% | 71,937,788 | 12,359,488 | 9.245 ms | 10,336 KiB |
-| `size` | 5,090,400 | -20.26% | 69,928,547 | 11,750,620 | 10.670 ms | 9,104 KiB |
-| `lto` | 4,968,224 | -22.18% | 69,716,235 | 11,721,472 | 16.420 ms | 8,844 KiB |
-| `static` | 5,009,472 | -21.53% | 69,850,098 | 11,743,492 | 14.429 ms | 8,896 KiB |
-| `clang-oz` | 5,025,184 | -21.29% | 69,795,920 | 11,761,900 | 10.305 ms | 8,724 KiB |
-| `lean` | 4,223,984 | -33.84% | 68,407,469 | 11,451,976 | 10.398 ms | 8,332 KiB |
-| `static-lean` | 3,673,432 | -42.46% | 67,456,470 | 11,387,468 | 14.443 ms | 7,584 KiB |
+| `baseline` | 6,384,032 | +0.00% | 71,938,414 | 12,364,144 | 9.273 ms | 10,280 KiB |
+| `size` | 5,090,400 | -20.26% | 69,929,173 | 11,752,804 | 9.609 ms | 9,060 KiB |
+| `lto` | 4,968,224 | -22.18% | 69,716,861 | 11,721,212 | 10.716 ms | 8,872 KiB |
+| `static` | 5,009,472 | -21.53% | 69,850,724 | 11,743,108 | 9.944 ms | 8,860 KiB |
+| `clang-oz` | 5,025,184 | -21.29% | 69,796,546 | 11,757,624 | 10.398 ms | 8,736 KiB |
+| `lean` | 4,223,984 | -33.84% | 68,408,095 | 11,453,428 | 10.325 ms | 8,344 KiB |
+| `static-lean` | 3,673,432 | -42.46% | 67,457,096 | 11,385,808 | 9.385 ms | 7,608 KiB |
 
 `static-lean` is the smallest profile. It is also the only profile linked
 against Debian 12 system libraries instead of the conda-forge toolchain
@@ -69,18 +69,18 @@ archive sizes are stable across runs.
 
 ## Distribution variants
 
-Cells show installed size / archive size in MiB. Every profile produces all six
-variants from the same stripped installation tree.
+Cells show installed size / archive size in MiB. Every profile produces all
+seven variants from the same stripped installation tree.
 
-| Profile | `headed` | `headless` | `micro` | `nano` | `runtime` | `test` |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `baseline` | 77.2 / 12.8 | 68.6 / 11.8 | 49.5 / 7.2 | 20.6 / 4.5 | 49.5 / 7.2 | 237.3 / 27.0 |
-| `size` | 75.3 / 12.2 | 66.7 / 11.2 | 47.6 / 6.6 | 18.7 / 3.9 | 47.6 / 6.6 | 233.3 / 26.2 |
-| `lto` | 75.1 / 12.2 | 66.5 / 11.2 | 47.4 / 6.6 | 18.5 / 3.9 | 47.4 / 6.6 | 286.3 / 64.2 |
-| `static` | 75.2 / 12.2 | 66.6 / 11.2 | 47.5 / 6.6 | 18.6 / 3.9 | 47.5 / 6.6 | 241.0 / 26.2 |
-| `clang-oz` | 75.1 / 12.2 | 66.6 / 11.2 | 47.4 / 6.6 | 18.6 / 3.9 | 47.4 / 6.6 | 233.1 / 26.3 |
-| `lean` | 73.8 / 11.9 | 65.2 / 10.9 | 46.2 / 6.3 | 17.3 / 3.6 | 46.2 / 6.3 | 232.8 / 26.1 |
-| `static-lean` | 72.9 / 11.9 | 64.3 / 10.9 | 45.3 / 6.3 | 16.4 / 3.5 | 45.3 / 6.3 | 240.6 / 26.0 |
+| Profile | `headed` | `headless` | `micro` | `nano` | `runtime` | `runtime-nano` | `test` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `baseline` | 77.2 / 12.8 | 68.6 / 11.8 | 49.5 / 7.2 | 20.6 / 4.5 | 49.5 / 7.2 | 20.6 / 4.5 | 237.3 / 27.0 |
+| `size` | 75.3 / 12.2 | 66.7 / 11.2 | 47.6 / 6.6 | 18.7 / 3.9 | 47.6 / 6.6 | 18.7 / 3.9 | 233.3 / 26.2 |
+| `lto` | 75.1 / 12.2 | 66.5 / 11.2 | 47.4 / 6.6 | 18.5 / 3.9 | 47.4 / 6.6 | 18.5 / 3.9 | 286.3 / 64.2 |
+| `static` | 75.2 / 12.2 | 66.6 / 11.2 | 47.5 / 6.6 | 18.6 / 3.9 | 47.5 / 6.6 | 18.6 / 3.9 | 241.0 / 26.2 |
+| `clang-oz` | 75.1 / 12.2 | 66.6 / 11.2 | 47.4 / 6.6 | 18.6 / 3.9 | 47.4 / 6.6 | 18.6 / 3.9 | 233.1 / 26.3 |
+| `lean` | 73.8 / 11.9 | 65.2 / 10.9 | 46.2 / 6.3 | 17.3 / 3.6 | 46.2 / 6.3 | 17.3 / 3.6 | 232.8 / 26.0 |
+| `static-lean` | 72.9 / 11.9 | 64.3 / 10.9 | 45.3 / 6.3 | 16.4 / 3.6 | 45.3 / 6.3 | 16.4 / 3.5 | 240.6 / 26.0 |
 
 The `lto` `test` archive at 64.2 MiB is an outlier. Every other `test` archive
 is close to 26 MiB. Investigate before using that cell as a baseline.
@@ -89,52 +89,63 @@ is close to 26 MiB. Investigate before using that cell as a baseline.
 
 | Distribution | Installed bytes | Archive bytes | Smoke imports |
 | --- | ---: | ---: | --- |
-| `headed` | 76,423,212 | 12,442,140 | `ssl`, `sqlite3`, `ctypes`, `tkinter` |
-| `headless` | 67,456,470 | 11,387,468 | `ssl`, `sqlite3`, `ctypes` |
-| `micro` | 47,474,194 | 6,558,320 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
-| `nano` | 17,228,342 | 3,721,540 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
-| `runtime` | 47,474,313 | 6,561,324 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
-| `test` | 252,291,530 | 27,280,416 | `ssl`, `sqlite3`, `ctypes`, `test` |
+| `headed` | 76,423,838 | 12,446,132 | `ssl`, `sqlite3`, `ctypes`, `tkinter` |
+| `headless` | 67,457,096 | 11,385,808 | `ssl`, `sqlite3`, `ctypes` |
+| `micro` | 47,474,820 | 6,557,056 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `nano` | 17,228,968 | 3,723,184 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `runtime` | 47,474,939 | 6,559,728 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `runtime-nano` | 17,229,087 | 3,721,880 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `test` | 252,292,201 | 27,271,496 | `ssl`, `sqlite3`, `ctypes`, `test` |
 
 `runtime` is the agent-sandbox target. It keeps `site-packages` so
 `numpy`/`pandas` installed at image-build time survive, and removes `pip`,
 `ensurepip`, headers, and build files.
 
-`nano` is the smallest archive. It removes `__pycache__`, so imports compile on
-first use. Use it only when the runtime filesystem can absorb that cost or is
-read-only with a warm build step.
+`runtime-nano` is the compact agent-sandbox target. It keeps `site-packages`,
+but removes `__pycache__` from both the standard library and installed packages.
+Imports compile on first use. Its installed tree is 30,245,852 bytes smaller
+than `runtime`. `nano` remains the smallest stdlib-only variant; its installed
+tree is 119 bytes smaller than `runtime-nano`.
 
 ## Runtime image footprint
 
-Both images use the `runtime` distribution in `linux-x86_64`.
+Measurements use `static-lean` on `linux-x86_64`. The three `runtime` images
+contain 47,474,939 installed bytes. The scratch `runtime-nano` image contains
+17,229,087 installed bytes.
 
-### Debian slim
+| Image | Distribution | Final bytes | MiB | Shell | Package manager |
+| --- | --- | ---: | ---: | --- | --- |
+| Debian slim | `runtime` | 129,918,089 | 123.90 | yes | apt |
+| Distroless | `runtime` | 73,808,996 | 70.39 | no | no |
+| Scratch | `runtime` | 63,730,573 | 60.78 | no | no |
+| Scratch | `runtime-nano` | 33,484,721 | 31.93 | no | no |
+
+Scratch `runtime` is 10,078,423 bytes smaller than distroless `runtime`, a
+13.7% reduction. Scratch `runtime-nano` is 40,324,275 bytes smaller than
+distroless `runtime`, a 54.6% reduction. It is 96,433,368 bytes smaller than
+the Debian slim `runtime` image, a 74.2% reduction.
+
+### Scratch root filesystem
 
 | Component | Bytes | MiB |
 | --- | ---: | ---: |
-| `debian:bookworm-slim` base | 74,867,382 | 71.40 |
-| SnugPy installation | 47,583,622 | 45.38 |
-| Optional system libraries | 8,097,024 | 7.72 |
-| Image, old single-stage build | 177,391,776 | 169.17 |
-| Image, multi-stage build | 130,681,569 | 124.63 |
+| SnugPy `runtime` or `runtime-nano` installation | varies | varies |
+| Shared libraries, loader, CA certificates, tzdata, NSS, runtime files | 16,255,634 | 15.50 |
+| Final scratch image | installation + 16,255,634 | |
 
-The multi-stage build saves 46,710,207 bytes, or 26.3% of the old image. The
-single-stage Dockerfile created two 47.5 MiB layers: one for `ADD` and one for
-the following `RUN mv`. The multi-stage build removes the duplicate.
+The scratch root filesystem contains only:
 
-### Distroless
+- `libc`, `libm`, `libmvec`, `libgcc_s`, and `libstdc++`
+- OpenSSL, SQLite, zlib, zstd, bz2, lzma, libffi, and libuuid
+- NSS resolver files and `/etc/nsswitch.conf`
+- the CA certificate bundle and OpenSSL configuration
+- full tzdata
+- `/etc/passwd`, `/etc/group`, `/tmp`, and `/home/nonroot`
 
-| Component | Bytes | MiB |
-| --- | ---: | ---: |
-| `gcr.io/distroless/cc-debian12:nonroot` base | 23,667,617 | 22.57 |
-| SnugPy installation | 47,583,622 | 45.38 |
-| Copied libraries and layer overhead | 2,557,131 | 2.44 |
-| Final distroless image | 73,808,370 | 70.39 |
-
-The distroless image is 56,873,199 bytes smaller than the Debian slim image, a
-43.5% reduction. It is 58.4% smaller than the original single-stage image. The
-image has no shell or package manager and runs as UID 65532. HTTPS, SQLite
-writes, `ctypes`, and the compression modules pass the same smoke test.
+It has no shell, package manager, compiler, userland utilities, or distro
+metadata. It runs as UID 65532. HTTPS, DNS, SQLite writes, `ctypes`, the
+compression modules, time zones, numpy 2.5.5, and pandas 3.1.1 passed local
+verification.
 
 ## External libraries used by `static-lean`
 
@@ -145,10 +156,10 @@ extensions load these libraries by soname at runtime:
 | --- | ---: | --- | --- |
 | `libcrypto.so.3` | 4,742,424 | `libssl3` | `_ssl`, `_hashlib` |
 | `libsqlite3.so.0` | 1,437,848 | `libsqlite3-0` | `_sqlite3` |
-| `libzstd.so.1` | 763,816 | `libzstd1` | `_zstd`, OpenSSL |
+| `libzstd.so.1` | 763,816 | `libzstd1` | `_zstd` |
 | `libssl.so.3` | 688,160 | `libssl3` | `_ssl` |
 | `liblzma.so.5` | 190,456 | `liblzma5` | `_lzma` |
-| `libz.so.1` | 121,280 | `zlib1g` | `zlib`, `binascii`, OpenSSL |
+| `libz.so.1` | 121,280 | `zlib1g` | `zlib`, `binascii` |
 | `libbz2.so.1.0` | 74,688 | `libbz2-1.0` | `_bz2` |
 | `libffi.so.8` | 43,480 | `libffi8` | `_ctypes` |
 | `libuuid.so.1` | 34,872 | `libuuid1` | `_uuid` |
@@ -167,4 +178,10 @@ See `docs/runtime-libraries.md` for the ABI gate and the image strategy.
 ./scripts/check-abi.sh out/v3.14.9/linux-x86_64/static-lean
 ./scripts/image-size.sh 3.14 static-lean linux-x86_64 \
   debian:bookworm-slim runtime
+IMAGE_DOCKERFILE=docker/runtime-distroless.Dockerfile \
+  ./scripts/image-size.sh 3.14 static-lean linux-x86_64 \
+  gcr.io/distroless/cc-debian12:nonroot runtime
+IMAGE_DOCKERFILE=docker/runtime-scratch.Dockerfile \
+  ./scripts/image-size.sh 3.14 static-lean linux-x86_64 \
+  debian:bookworm-slim runtime-nano
 ```
