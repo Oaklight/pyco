@@ -132,6 +132,7 @@ class DistributionTests(unittest.TestCase):
         self.assertTrue(
             headless.matches_exclude("lib/python3.14/config-3.14-x86_64/python.o")
         )
+        self.assertTrue(headless.matches_exclude("lib/libpython3.14.a"))
         self.assertFalse(headless.matches_exclude("lib/python3.14/json/__init__.py"))
         self.assertFalse(
             headless.matches_exclude("lib/python3.14/site-packages/test_helper.py")
