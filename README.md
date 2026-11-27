@@ -34,6 +34,46 @@ is one pinned CPython 3.14 maintenance release. A future version is added as its
 own pinned source, build matrix, and release decision; compiled objects,
 prefixes, and configuration are never shared between versions.
 
+## Install
+
+The `snugpy` package on PyPI is the build and measurement tool, not the
+interpreter runtime. Use a distribution archive or a Docker image for the
+runtime.
+
+```bash
+python -m pip install snugpy
+snugpy list
+```
+
+### Docker Hub
+
+Runtime images are published at
+[`oaklight/snugpy`](https://hub.docker.com/r/oaklight/snugpy). They are
+`linux/amd64` only.
+
+| Tag | Distribution | Base | Shell | pip |
+| --- | --- | --- | --- | --- |
+| `0.1.0`, `latest` | `runtime-nano` | `scratch` | no | no |
+| `0.1.0-runtime` | `runtime` | `scratch` | no | no |
+| `0.1.0-distroless` | `runtime` | distroless `cc-debian12` | no | no |
+| `0.1.0-debian` | `runtime` | Debian 12 slim | yes | no |
+
+`runtime` keeps preinstalled `site-packages` and precompiled bytecode.
+`runtime-nano` removes precompiled bytecode, so it starts smaller but compiles
+modules on first import. The scratch images run as UID 65532 and contain no
+shell or package manager.
+
+```bash
+docker run --rm --entrypoint python3.14 oaklight/snugpy:0.1.0 \
+  -c 'import ssl, sqlite3; print("runtime-ok")'
+
+docker run --rm --entrypoint python3.14 oaklight/snugpy:0.1.0-debian \
+  -c 'import ssl, sqlite3; print("runtime-ok")'
+```
+
+The release workflow builds, smoke-tests, and pushes these tags. It does not
+publish multi-architecture manifests.
+
 ## Quick start
 
 The toolchain is a conda-forge environment. It contains Python 3.12, GCC 16,
@@ -100,7 +140,7 @@ Regenerate the lock after an intentional environment change:
 | `static` | GCC `-Os` | `--disable-shared` | Static libpython linkage; not a fully static system binary |
 | `clang-oz` | Clang `-Oz` | shared libpython | Aggressive size experiment |
 | `lean` | Clang `-Oz` | shared libpython, `--without-doc-strings`, `--gc-sections` | Smallest shared experiment; removes C docstrings and unwind tables |
-| `static-lean` | Clang `-Oz` | `--disable-shared`, `--without-doc-strings`, non-PIE, LLD ICF, Debian 12 system libraries | Smallest deployment core; non-PIE link, hidden symbols, no unwind tables, section GC |
+| `static-lean` | Clang `-Oz` | `--disable-shared`, `--without-doc-strings`, non-PIE, safe LLD ICF, Debian 12 system libraries | Smallest deployment core; non-PIE link, hidden symbols, no unwind tables, section GC |
 
 `static-lean` links the interpreter as a non-PIE executable. This removes
 dynamic relocations and shrinks the core, but it disables address-space layout
@@ -246,12 +286,16 @@ An aggregate job downloads all profile results and regenerates the report.
 measurement path. It runs the full CPython suite and zerodep tests with network
 access, then packages and measures one selected profile.
 
-No release workflow is enabled yet. Release selection requires human approval in
-`configs/release-selection.toml` after the compatibility and performance gates
-pass.
+`.github/workflows/release.yml` is the release path. It verifies the source
+version and the approved release profile, builds and fully tests `static-lean`,
+publishes the Python package to PyPI, pushes the Docker Hub images, and creates
+the GitHub Release with archives, checksums, and the report. Set
+`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `PYPI_API_TOKEN` as repository
+secrets before running it.
 
 ## Documentation
 
+- `CHANGELOG.md`: release history and known limitations
 - `docs/version-matrix.md`: Python versions, profiles, distributions, and sizes
 - `docs/runtime-libraries.md`: ABI gate, library inventory, and image sizes
 

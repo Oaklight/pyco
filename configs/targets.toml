@@ -34,6 +34,7 @@ apt_packages = [
   "lld",
   "llvm",
   "make",
+  "netbase",
   "patch",
   "patchelf",
   "pkg-config",

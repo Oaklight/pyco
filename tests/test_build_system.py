@@ -100,7 +100,7 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("-fno-unwind-tables", static_lean.cflags)
         self.assertIn("-fvisibility=hidden", static_lean.cflags)
         self.assertIn("-no-pie", static_lean.ldflags)
-        self.assertIn("-Wl,--icf=all", static_lean.ldflags)
+        self.assertIn("-Wl,--icf=safe", static_lean.ldflags)
         self.assertEqual(static_lean.external_libs, "system")
 
     def test_release_selection_is_not_approved(self) -> None:

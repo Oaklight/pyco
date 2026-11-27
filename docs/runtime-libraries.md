@@ -115,6 +115,29 @@ the same module and SQLite smoke test. The Debian slim and distroless images use
 | Scratch | `runtime` | 63,730,573 | 60.78 | no | no |
 | Scratch | `runtime-nano` | 33,484,721 | 31.93 | no | no |
 
+### Docker Hub tags
+
+The release workflow publishes the `static-lean` images for `linux/amd64`:
+
+| Tag | Distribution | Dockerfile |
+| --- | --- | --- |
+| `oaklight/snugpy:0.1.0` | `runtime-nano` | `runtime-scratch.Dockerfile` |
+| `oaklight/snugpy:latest` | `runtime-nano` | `runtime-scratch.Dockerfile` |
+| `oaklight/snugpy:0.1.0-runtime` | `runtime` | `runtime-scratch.Dockerfile` |
+| `oaklight/snugpy:0.1.0-distroless` | `runtime` | `runtime-distroless.Dockerfile` |
+| `oaklight/snugpy:0.1.0-debian` | `runtime` | `runtime.Dockerfile` |
+
+`scripts/publish-images.sh` builds every image, runs the module and SQLite
+smoke test, and only pushes after the smoke test passes. Use `--push` to
+publish and `--latest` to add the `latest` tag. The release workflow supplies
+the Docker Hub credentials through repository secrets.
+
+```bash
+SNUGPY_RELEASE=0.1.0 ./scripts/publish-images.sh \
+  3.14 static-lean linux-x86_64 \
+  --namespace oaklight --tag 0.1.0 --push --latest
+```
+
 ### Debian slim
 
 `docker/runtime.Dockerfile` starts from `debian:bookworm-slim`, installs only

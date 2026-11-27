@@ -1,0 +1,340 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version; must match snugpy_build.__version__
+        required: true
+        default: "0.1.0"
+      publish_pypi:
+        description: Publish the Python package to PyPI
+        type: boolean
+        default: true
+      publish_docker:
+        description: Build and push the Docker Hub images
+        type: boolean
+        default: true
+      push_latest:
+        description: Also update the Docker Hub latest tag
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  SNUGPY_VERSION: "3.14"
+  SNUGPY_TARGET: "linux-x86_64"
+  SNUGPY_RELEASE: ${{ inputs.version }}
+  SNUGPY_COMMIT: ${{ github.sha }}
+
+jobs:
+  verify:
+    name: Verify release inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify source version
+        run: |
+          python - <<'PY'
+          import os
+          from snugpy_build import __version__
+          expected = os.environ["SNUGPY_RELEASE"]
+          if __version__ != expected:
+              raise SystemExit(
+                  f"snugpy_build.__version__ is {__version__!r}, expected {expected!r}"
+              )
+          print(f"version={__version__}")
+          PY
+      - name: Verify approved release profile
+        run: |
+          python - <<'PY'
+          from snugpy_build.config import load_config
+          selections = load_config().release_selection
+          matching = [
+              item
+              for item in selections
+              if item.version_key == "3.14" and item.target == "linux-x86_64"
+          ]
+          if len(matching) != 1:
+              raise SystemExit(
+                  f"expected one release selection for 3.14/linux-x86_64, got {len(matching)}"
+              )
+          selection = matching[0]
+          if not selection.approved or selection.profile != "static-lean":
+              raise SystemExit(
+                  "release selection must approve static-lean: "
+                  f"profile={selection.profile!r}, approved={selection.approved}"
+              )
+          print(f"release_profile={selection.profile}")
+          PY
+      - name: Verify release name is unused
+        run: |
+          if gh release view "v${SNUGPY_RELEASE}" >/dev/null 2>&1; then
+            echo "GitHub release v${SNUGPY_RELEASE} already exists" >&2
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/v${SNUGPY_RELEASE}" | grep -q .; then
+            echo "Git tag v${SNUGPY_RELEASE} already exists" >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.publish_pypi }}" == "true" ]]; then
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              "https://pypi.org/pypi/snugpy/${SNUGPY_RELEASE}/json")
+            if [[ $status == 200 ]]; then
+              echo "PyPI release snugpy==${SNUGPY_RELEASE} already exists" >&2
+              exit 1
+            fi
+          fi
+      - name: Install lint tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends shellcheck
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Run unit and shell checks
+        run: make check PYTHON=python
+
+  build:
+    name: Build release archive
+    needs: verify
+    runs-on: ubuntu-24.04
+    container: debian:bookworm
+    timeout-minutes: 360
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      SNUGPY_CONDA_PREFIX: /opt/snugpy-env
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            binutils ca-certificates curl file gcc git gzip libc6-dev make netbase patch \
+            pkg-config xz-utils zlib1g-dev libbz2-dev libdb-dev libexpat1-dev \
+            libffi-dev libgdbm-dev libgdbm-compat-dev liblzma-dev libncurses-dev \
+            libreadline-dev libsqlite3-dev libssl-dev libzstd-dev tk-dev \
+            uuid-dev libbrotli-dev
+      - name: Trust cached source trees
+        run: git config --global --add safe.directory '*'
+      - name: Install conda
+        run: |
+          curl --fail --location --silent --show-error \
+            "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" \
+            -o /tmp/miniforge.sh
+          bash /tmp/miniforge.sh -b -p /opt/miniforge3
+          echo "/opt/miniforge3/bin" >> "$GITHUB_PATH"
+      - name: Cache verified CPython sources
+        uses: actions/cache@v4
+        with:
+          path: sources/
+          key: snugpy-sources-${{ hashFiles('configs/versions.toml') }}
+      - name: Create locked conda environment
+        run: |
+          conda create --yes --prefix "$SNUGPY_CONDA_PREFIX" \
+            --file conda-linux-64.lock \
+            --override-channels -c conda-forge
+      - name: Install gdbm ndbm compatibility
+        run: ./scripts/install-gdbm-compat.sh "$SNUGPY_CONDA_PREFIX"
+      - name: Build, test, package, and measure
+        shell: bash
+        run: |
+          export PATH="$SNUGPY_CONDA_PREFIX/bin:$PATH"
+          export PYTHONPATH="$PWD"
+          python --version
+          ./scripts/fetch.sh "$SNUGPY_VERSION" --zerodep
+          ./scripts/build.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
+            --jobs "$(nproc)"
+          ./scripts/test.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
+            --full --network --jobs 1
+          ./scripts/package.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET"
+          ./scripts/measure.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
+            --runs 5
+          ./scripts/report.sh
+      - name: Verify release gates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("results/v3.14.9/linux-x86_64/static-lean")
+          tests = json.loads((root / "tests.json").read_text())
+          if tests["eligible"] is not True:
+              raise SystemExit("release tests are not eligible")
+          if tests["status"] != "passed":
+              raise SystemExit(f"release tests status is {tests['status']!r}")
+          for name in ("fail", "skip"):
+              if tests["counts"].get(name, 0) != 0:
+                  raise SystemExit(f"release tests have {name} gates")
+          gates = {gate["name"]: gate["status"] for gate in tests["gates"]}
+          for name in ("cpython regression", "zerodep tests"):
+              if gates.get(name) != "pass":
+                  raise SystemExit(f"{name} gate is {gates.get(name)!r}")
+          package = json.loads((root / "package.json").read_text())
+          failing = [
+              name
+              for name, variant in package["variants"].items()
+              if variant.get("status") != "pass"
+          ]
+          if failing:
+              raise SystemExit(f"distribution smoke failures: {', '.join(failing)}")
+          print("release gates: pass")
+          PY
+      - name: Verify external library ABI
+        run: ./scripts/check-abi.sh "out/v3.14.9/linux-x86_64/static-lean"
+      - name: Show failure logs
+        if: failure()
+        shell: bash
+        run: |
+          while IFS= read -r -d '' log_file; do
+            echo "===== ${log_file}"
+            tail -80 "${log_file}"
+          done < <(find results -type f -path '*/logs/*.log' -print0)
+      - name: Upload release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snugpy-release-dist
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/*.tar.xz
+            results/**/*.json
+            results/**/logs/*.log
+            results/summary.csv
+            results/report.md
+
+  pypi:
+    name: Publish to PyPI
+    needs: [build, docker]
+    if: |
+      inputs.publish_pypi &&
+      (needs.docker.result == 'success' || needs.docker.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build Python distributions
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build --outdir python-dist
+          python -m twine check python-dist/*
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python-dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  docker:
+    name: Publish to Docker Hub
+    needs: build
+    if: inputs.publish_docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: snugpy-release-dist
+          path: .
+      - name: Log in to Docker Hub
+        run: |
+          printf '%s' "$DOCKERHUB_TOKEN" |
+            docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+      - name: Build, smoke-test, and push images
+        shell: bash
+        run: |
+          args=(
+            "$SNUGPY_VERSION"
+            static-lean
+            "$SNUGPY_TARGET"
+            --namespace "$DOCKERHUB_USERNAME"
+            --tag "$SNUGPY_RELEASE"
+            --push
+          )
+          if [[ "${{ inputs.push_latest }}" == "true" ]]; then
+            args+=(--latest)
+          fi
+          ./scripts/publish-images.sh "${args[@]}" | tee docker-images.txt
+      - name: Log out from Docker Hub
+        if: always()
+        run: docker logout || true
+      - name: Upload image report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snugpy-docker-images
+          if-no-files-found: warn
+          retention-days: 30
+          path: docker-images.txt
+
+  github-release:
+    name: Create GitHub Release
+    needs: [build, pypi, docker]
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.pypi.result == 'success' || needs.pypi.result == 'skipped') &&
+      (needs.docker.result == 'success' || needs.docker.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: snugpy-release-dist
+          path: .
+      - name: Generate SHA256SUMS and release notes
+        run: |
+          (cd dist && sha256sum ./*.tar.xz) > SHA256SUMS
+          python - "$SNUGPY_RELEASE" > /tmp/release-notes.md <<'PY'
+          import pathlib
+          import sys
+
+          version = sys.argv[1]
+          text = pathlib.Path("CHANGELOG.md").read_text()
+          marker = f"## [{version}]"
+          start = text.index(marker)
+          next_start = text.find("\n## [", start + len(marker))
+          section = text[start: next_start if next_start != -1 else None].strip()
+          if not section:
+              raise SystemExit(f"empty changelog section for {version}")
+          print(section)
+          PY
+          cat /tmp/release-notes.md
+      - name: Create release and upload assets
+        run: |
+          gh release create "v${SNUGPY_RELEASE}" \
+            --target "$GITHUB_SHA" \
+            --title "SnugPy ${SNUGPY_RELEASE}" \
+            --notes-file /tmp/release-notes.md \
+            --latest \
+            dist/*.tar.xz SHA256SUMS results/report.md results/summary.csv
