@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [baseline, size, lto, static, clang-oz, lean]
+        profile: [baseline, size, lto, static, clang-oz, lean, static-lean]
     steps:
       - uses: actions/checkout@v4
       - name: Install conda

@@ -6,7 +6,7 @@ on:
       profile:
         description: Build profile
         type: choice
-        options: [baseline, size, lto, static, clang-oz]
+        options: [baseline, size, lto, static, clang-oz, lean, static-lean]
         default: baseline
       runs:
         description: Measurement repetitions

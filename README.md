@@ -98,7 +98,8 @@ Regenerate the lock after an intentional environment change:
 | `lto` | GCC `-Os` | `--with-lto`, shared libpython | Size plus link-time optimization |
 | `static` | GCC `-Os` | `--disable-shared` | Static libpython linkage; not a fully static system binary |
 | `clang-oz` | Clang `-Oz` | shared libpython | Aggressive size experiment |
-| `lean` | Clang `-Oz` | shared libpython, `--without-doc-strings`, `--gc-sections` | Smallest experiment; removes C docstrings and unwind tables |
+| `lean` | Clang `-Oz` | shared libpython, `--without-doc-strings`, `--gc-sections` | Smallest shared experiment; removes C docstrings and unwind tables |
+| `static-lean` | Clang `-Oz` | `--disable-shared`, `--without-doc-strings`, LLD ICF | Static core experiment; hidden symbols, no unwind tables, section GC |
 
 Each profile has a separate work tree, install prefix, logs, and result
 directory. A profile is release-eligible only after full CPython regression
@@ -153,7 +154,7 @@ distribution and lists every variant's installed and archive size separately.
 | `make package PROFILE=size` | Create stripped archives for every distribution and smoke-test them |
 | `make package PROFILE=size DISTRIBUTION=headless` | Create and test one distribution |
 | `make report` | Write `results/summary.csv` and `results/report.md` |
-| `make matrix` | Run all six profiles without stopping on unrelated failures |
+| `make matrix` | Run all seven profiles without stopping on unrelated failures |
 | `make clean` | Remove `work/`, `out/`, and `dist/` |
 
 The direct scripts accept `VERSION`, `TARGET`, and `PROFILE` as positional
@@ -201,7 +202,7 @@ results/        metadata per cell; summary.csv and report.md are tracked
 
 ## CI
 
-`.github/workflows/ci.yml` runs the unit checks, then builds the six profiles
+`.github/workflows/ci.yml` runs the unit checks, then builds the seven profiles
 as independent matrix jobs with `fail-fast: false`. Each job creates its conda
 environment from `conda-linux-64.lock`, runs fetch, build, smoke tests,
 packaging, and measurement, and uploads its JSON results and archives. An

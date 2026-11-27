@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="${VERSION:-3.14}"
 TARGET="${TARGET:-linux-x86_64}"
 RUNS="${RUNS:-10}"
-PROFILES=(baseline size lto static clang-oz lean)
+PROFILES=(baseline size lto static clang-oz lean static-lean)
 MODE="--smoke"
 NETWORK=""
 
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
 		cat <<'EOF'
 Usage: scripts/matrix.sh [--version 3.14] [--target linux-x86_64] [--runs 10] [--full] [--network]
 
-Runs fetch, build, test, measure, and package for the six profiles.
+Runs fetch, build, test, measure, and package for the seven profiles.
 A failed cell does not stop unrelated cells.
 EOF
 		exit 0
