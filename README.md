@@ -99,7 +99,7 @@ Regenerate the lock after an intentional environment change:
 | `static` | GCC `-Os` | `--disable-shared` | Static libpython linkage; not a fully static system binary |
 | `clang-oz` | Clang `-Oz` | shared libpython | Aggressive size experiment |
 | `lean` | Clang `-Oz` | shared libpython, `--without-doc-strings`, `--gc-sections` | Smallest shared experiment; removes C docstrings and unwind tables |
-| `static-lean` | Clang `-Oz` | `--disable-shared`, `--without-doc-strings`, `--with-lto=full`, LLD ICF | Static core experiment; full LTO, hidden symbols, no unwind tables, section GC |
+| `static-lean` | Clang `-Oz` | `--disable-shared`, `--without-doc-strings`, non-PIE, LLD ICF | Static core experiment; non-PIE link, hidden symbols, no unwind tables, section GC |
 
 Each profile has a separate work tree, install prefix, logs, and result
 directory. A profile is release-eligible only after full CPython regression
