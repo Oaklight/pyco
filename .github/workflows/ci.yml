@@ -168,6 +168,10 @@ jobs:
             echo "===== ${log_file}"
             tail -80 "${log_file}"
           done < <(find results -type f -path '*/logs/*.log' -print0)
+          while IFS= read -r -d '' config_log; do
+            echo "===== ${config_log}"
+            tail -160 "${config_log}"
+          done < <(find work -name config.log -print0 2>/dev/null)
       - name: Upload profile results
         if: always()
         uses: actions/upload-artifact@v4
