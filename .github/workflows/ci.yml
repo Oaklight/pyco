@@ -206,13 +206,21 @@ jobs:
           ./scripts/image-size.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
             debian:bookworm-slim runtime |
             tee results/v3.14.9/linux-x86_64/static-lean/runtime-image.txt
+      - name: Build and smoke-test distroless runtime image
+        run: |
+          IMAGE_DOCKERFILE=docker/runtime-distroless.Dockerfile \
+            ./scripts/image-size.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
+              gcr.io/distroless/cc-debian12:nonroot runtime |
+            tee results/v3.14.9/linux-x86_64/static-lean/runtime-image-distroless.txt
       - name: Upload image measurement
         uses: actions/upload-artifact@v4
         with:
           name: snugpy-runtime-image
           if-no-files-found: error
           retention-days: 14
-          path: results/v3.14.9/linux-x86_64/static-lean/runtime-image.txt
+          path: |
+            results/v3.14.9/linux-x86_64/static-lean/runtime-image.txt
+            results/v3.14.9/linux-x86_64/static-lean/runtime-image-distroless.txt
 
   aggregate:
     name: Aggregate report

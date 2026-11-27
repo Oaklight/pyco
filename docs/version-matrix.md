@@ -106,21 +106,35 @@ read-only with a warm build step.
 
 ## Runtime image footprint
 
-Measured with `debian:bookworm-slim` as the base and `runtime` as the
-distribution.
+Both images use the `runtime` distribution in `linux-x86_64`.
+
+### Debian slim
 
 | Component | Bytes | MiB |
 | --- | ---: | ---: |
-| Base image | 74,867,382 | 71.40 |
+| `debian:bookworm-slim` base | 74,867,382 | 71.40 |
 | SnugPy installation | 47,583,622 | 45.38 |
 | Optional system libraries | 8,097,024 | 7.72 |
 | Image, old single-stage build | 177,391,776 | 169.17 |
 | Image, multi-stage build | 130,681,569 | 124.63 |
 
 The multi-stage build saves 46,710,207 bytes, or 26.3% of the old image. The
-single-stage Dockerfile created two 47.5 MiB layers: one for `ADD` and one
-for the following `RUN mv`. The multi-stage build removes the duplicate. The
-image contains no compiler, no package manager, and no build headers.
+single-stage Dockerfile created two 47.5 MiB layers: one for `ADD` and one for
+the following `RUN mv`. The multi-stage build removes the duplicate.
+
+### Distroless
+
+| Component | Bytes | MiB |
+| --- | ---: | ---: |
+| `gcr.io/distroless/cc-debian12:nonroot` base | 23,667,617 | 22.57 |
+| SnugPy installation | 47,583,622 | 45.38 |
+| Copied libraries and layer overhead | 2,557,131 | 2.44 |
+| Final distroless image | 73,808,370 | 70.39 |
+
+The distroless image is 56,873,199 bytes smaller than the Debian slim image, a
+43.5% reduction. It is 58.4% smaller than the original single-stage image. The
+image has no shell or package manager and runs as UID 65532. HTTPS, SQLite
+writes, `ctypes`, and the compression modules pass the same smoke test.
 
 ## External libraries used by `static-lean`
 

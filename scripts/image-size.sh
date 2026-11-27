@@ -36,8 +36,13 @@ cp "$archive" "$work/runtime.tar.xz"
 
 tag="snugpy-image-${profile}-${distribution}-$(date +%s)-$$"
 packages=${IMAGE_PACKAGES:-libssl3 libsqlite3-0}
+dockerfile=${IMAGE_DOCKERFILE:-docker/runtime.Dockerfile}
+case "$dockerfile" in
+/*) ;;
+*) dockerfile=$repo_root/$dockerfile ;;
+esac
 docker build -q \
-	-f "$repo_root/docker/runtime.Dockerfile" \
+	-f "$dockerfile" \
 	--build-arg BASE="$base_image" \
 	--build-arg PACKAGES="$packages" \
 	--build-arg ARCHIVE=runtime.tar.xz \
@@ -45,10 +50,11 @@ docker build -q \
 	"$work" >/dev/null
 
 bytes=$(docker image inspect "$tag" --format '{{.Size}}')
-docker run --rm "$tag" python3.14 -c \
+docker run --rm --entrypoint python3.14 "$tag" -c \
 	"import ssl, sqlite3, ctypes, json, asyncio; print('runtime-ok')"
 
 echo "image=$tag"
+echo "dockerfile=$dockerfile"
 echo "base=$base_image"
 echo "distribution=$distribution"
 echo "image_bytes=$bytes"

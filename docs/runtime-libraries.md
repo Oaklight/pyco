@@ -102,6 +102,11 @@ also pulled brotli, which added about 1 MiB. Debian 12 avoids that chain.
 
 ## Runtime image strategy
 
+SnugPy has two runtime Dockerfiles. Both use `runtime`, keep `site-packages`,
+and run the same `ssl`, `sqlite3`, `ctypes`, `json`, and `asyncio` smoke test.
+
+### Debian slim
+
 `docker/runtime.Dockerfile` starts from `debian:bookworm-slim`, installs only
 `libssl3` and `libsqlite3-0`, copies the `runtime` distribution to `/opt/snugpy`,
 and sets `PATH`. `libbz2`, `libffi`, `liblzma`, `libuuid`, `libzstd`, and
@@ -124,32 +129,76 @@ by `RUN mv` in one stage leaves two copies in the image. The old single-stage
 Dockerfile measured 177,391,776 bytes. The multi-stage Dockerfile measures
 130,681,569 bytes, a reduction of 46,710,207 bytes or 26.3%.
 
+### Distroless
+
+`docker/runtime-distroless.Dockerfile` uses
+`gcr.io/distroless/cc-debian12:nonroot` as the final stage. Distroless removes
+the shell, package manager, and most of the Debian userland. It still provides
+glibc, `libgcc`, OpenSSL 3, and the CA certificate bundle.
+
+A Debian builder stage installs and copies only the libraries that distroless
+lacks:
+
+- `libsqlite3.so.0`
+- `libffi.so.8`
+- `libbz2.so.1.0`
+- `liblzma.so.5`
+- `libuuid.so.1`
+- `libz.so.1`
+- `libzstd.so.1`
+
+The image runs as the distroless `nonroot` user, UID 65532.
+
 | Component | Bytes |
 | --- | ---: |
-| `debian:bookworm-slim` base | 74,867,382 |
+| `gcr.io/distroless/cc-debian12:nonroot` base | 23,667,617 |
 | SnugPy `runtime` installation | 47,583,622 |
-| Optional system libraries | 8,097,024 |
-| Final image, multi-stage | 130,681,569 |
+| Copied libraries and layer overhead | 2,557,131 |
+| Final distroless image | 73,808,370 |
 
-The image has no compiler, package manager, headers, or archive. To change the
-library set, set `IMAGE_PACKAGES` when running `scripts/image-size.sh`.
+The distroless image is 56,873,199 bytes smaller than the Debian slim image, a
+43.5% reduction. It is 58.4% smaller than the original single-stage image.
+
+Verified inside the image:
+
+```text
+runtime-ok
+ssl OpenSSL 3.0.20
+sqlite 1
+https 200
+```
+
+The smoke test covers `ssl`, `sqlite3` writes, `ctypes`, `json`, `asyncio`,
+`bz2`, `lzma`, `zlib`, `uuid`, and `hashlib`, plus an HTTPS request.
+
+### Comparison
+
+| Image | Base bytes | Final bytes | Shell | Package manager |
+| --- | ---: | ---: | --- | --- |
+| Debian slim | 74,867,382 | 130,681,569 | yes | apt |
+| Distroless | 23,667,617 | 73,808,370 | no | no |
+
+`scripts/image-size.sh` selects the Dockerfile with `IMAGE_DOCKERFILE`:
+
+```bash
+IMAGE_DOCKERFILE=docker/runtime-distroless.Dockerfile \
+  ./scripts/image-size.sh 3.14 static-lean linux-x86_64 \
+    gcr.io/distroless/cc-debian12:nonroot runtime
+```
 
 ## Next options
 
 - Offline variant: drop `_ssl` and `_hashlib` to remove `libssl` and
-  `libcrypto`, saving 5.4 MiB in the image. This breaks HTTPS, so it needs a
-  separate distribution name.
+  `libcrypto`, saving 5.4 MiB. This breaks HTTPS, so it needs a separate
+  distribution name.
 - Minimal SQLite: compile a reduced amalgamation into `_sqlite3`. This removes
   the 1.4 MiB system dependency and may shrink the total, at the cost of a
   build-time SQLite pin.
 - Minimal OpenSSL: build a pinned OpenSSL without legacy providers, engines,
   tests, docs, zstd, or brotli. Bundle it only if a target base image cannot
   provide a compatible OpenSSL.
-- Pinned base image: record the base image digest next to the archive hash so
-  the image is reproducible.
-- Alternative base: measure `gcr.io/distroless/cc-debian12`, which removes the
-  shell and package manager. The interpreter only needs glibc and the sonames
-  above.
+- Pinned base images: record the Debian and distroless digests next to the
+  archive hash so both images are reproducible.
 
 Remeasure after every change:
 

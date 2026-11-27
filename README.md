@@ -142,9 +142,12 @@ curses and readline. `runtime` keeps `site-packages`, so packages installed at
 image-build time (numpy, pandas, and others) survive; only `pip`,
 `pip-*.dist-info`, `ensurepip`, and `bin/pip*` are removed. `nano` also drops
 precompiled bytecode, so each process compiles modules on first import; expect
-a small startup cost when the runtime filesystem is read-only. Edit
-`configs/distributions.toml` to change the variants; the default distribution
-is `headless`.
+a small startup cost when the runtime filesystem is read-only. Two runtime
+Dockerfiles are provided: `docker/runtime.Dockerfile` for Debian slim and
+`docker/runtime-distroless.Dockerfile` for distroless. The distroless image is
+about 70 MiB, including the interpreter, system libraries, and CA certificates.
+Edit `configs/distributions.toml` to change the variants; the default
+distribution is `headless`.
 
 Variant names are appended to archive filenames, for example
 `snugpy-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`. The package
