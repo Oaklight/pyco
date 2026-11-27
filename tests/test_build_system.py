@@ -101,6 +101,7 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("-fvisibility=hidden", static_lean.cflags)
         self.assertIn("-no-pie", static_lean.ldflags)
         self.assertIn("-Wl,--icf=all", static_lean.ldflags)
+        self.assertEqual(static_lean.external_libs, "system")
 
     def test_release_selection_is_not_approved(self) -> None:
         selections = self.config.release_selection
@@ -320,6 +321,17 @@ class ProfileEnvironmentTests(unittest.TestCase):
                 self.assertEqual(env["CFLAGS"], cflags)
                 self.assertEqual(env["CC"], self.config.profiles[name].cc)
                 self.assertEqual(env["CXX"], self.config.profiles[name].cxx)
+
+    def test_system_external_libs_drop_conda_search_paths(self) -> None:
+        env = self.config.profiles["static-lean"].environment(self.contaminated)
+        self.assertEqual(
+            env["PKG_CONFIG_LIBDIR"],
+            "/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig",
+        )
+        self.assertNotIn(f"-I{self.prefix}/include", env["CPPFLAGS"])
+        self.assertNotIn(f"-L{self.prefix}/lib", env["LDFLAGS"])
+        self.assertNotIn("LIBRARY_PATH", env)
+        self.assertEqual(env["LD_LIBRARY_PATH"], "/custom/lib")
 
     def test_snugpy_prefix_takes_precedence(self) -> None:
         base = {

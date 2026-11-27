@@ -32,6 +32,13 @@ _CONTAMINATING_FLAGS = (
 )
 
 
+_SYSTEM_PKGCONFIG_DIRS = (
+    "/usr/lib/x86_64-linux-gnu/pkgconfig",
+    "/usr/lib/pkgconfig",
+    "/usr/share/pkgconfig",
+)
+
+
 class ProfileError(SnugPyError):
     """Raised for invalid profile configuration."""
 
@@ -60,6 +67,7 @@ class ProfileSpec:
     cxxflags: str
     ldflags: str
     experimental: bool
+    external_libs: str = "conda"
 
     def environment(self, base: Mapping[str, str] | None = None) -> dict[str, str]:
         """Return a clean toolchain environment for this profile.
@@ -89,7 +97,33 @@ class ProfileSpec:
         prefix = environment.get("SNUGPY_CONDA_PREFIX") or environment.get(
             "CONDA_PREFIX"
         )
-        if prefix:
+        if self.external_libs == "system":
+            pkgconfig_dirs = ":".join(_SYSTEM_PKGCONFIG_DIRS)
+            environment["PKG_CONFIG_PATH"] = pkgconfig_dirs
+            environment["PKG_CONFIG_LIBDIR"] = pkgconfig_dirs
+            environment.pop("LIBRARY_PATH", None)
+            excluded_prefixes = [
+                value.rstrip("/")
+                for value in (
+                    environment.get("SNUGPY_CONDA_PREFIX"),
+                    environment.get("CONDA_PREFIX"),
+                )
+                if value
+            ]
+            library_paths = [
+                entry
+                for entry in environment.get("LD_LIBRARY_PATH", "").split(":")
+                if entry
+                and not any(
+                    entry == root or entry.startswith(f"{root}/")
+                    for root in excluded_prefixes
+                )
+            ]
+            if library_paths:
+                environment["LD_LIBRARY_PATH"] = ":".join(library_paths)
+            else:
+                environment.pop("LD_LIBRARY_PATH", None)
+        elif prefix:
             include_dir = f"{prefix.rstrip('/')}/include"
             lib_dir = f"{prefix.rstrip('/')}/lib"
             pkgconfig_dir = f"{lib_dir}/pkgconfig"
@@ -138,12 +172,17 @@ def load_profiles(path: Path) -> dict[str, ProfileSpec]:
                 cxxflags=str(raw.get("cxxflags", "")),
                 ldflags=str(raw.get("ldflags", "")),
                 experimental=bool(raw.get("experimental", False)),
+                external_libs=str(raw.get("external_libs", "conda")),
             )
         except (KeyError, TypeError) as error:
             raise ProfileError(f"{path}: invalid profile {name!r}: {error}") from error
         if not all(flag.startswith("-") for flag in profile.configure):
             raise ProfileError(
                 f"{path}: profile {name!r} has a malformed configure flag"
+            )
+        if profile.external_libs not in {"conda", "system"}:
+            raise ProfileError(
+                f"{path}: profile {name!r} has an invalid external_libs value"
             )
         profiles[name] = profile
     return profiles

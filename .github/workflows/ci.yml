@@ -71,6 +71,14 @@ jobs:
         env:
           SNUGPY_CONDA_PREFIX: ${{ runner.temp }}/snugpy-env
         run: ./scripts/install-gdbm-compat.sh "$SNUGPY_CONDA_PREFIX"
+      - name: Install system library headers
+        if: matrix.profile == 'static-lean'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libssl-dev libsqlite3-dev zlib1g-dev liblzma-dev libbz2-dev \
+            libzstd-dev libffi-dev uuid-dev libexpat1-dev libbrotli-dev \
+            libreadline-dev libncurses-dev libgdbm-dev libdb-dev
       - name: Build, test, package, and measure
         shell: bash -el {0}
         env:
@@ -85,6 +93,9 @@ jobs:
           ./scripts/test.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --smoke
           ./scripts/package.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET"
           ./scripts/measure.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --runs 5
+      - name: Verify external library ABI
+        if: matrix.profile == 'static-lean'
+        run: ./scripts/check-abi.sh "out/v3.14.9/linux-x86_64/static-lean"
       - name: Show failure logs
         if: failure()
         shell: bash
