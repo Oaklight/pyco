@@ -337,13 +337,11 @@ class ProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(env["PKG_CONFIG"], "/usr/bin/pkg-config")
         self.assertEqual(env["PKG_CONFIG_DONT_DEFINE_PREFIX"], "1")
 
-    def test_system_external_libs_keep_sysroot_before_system(self) -> None:
+    def test_system_external_libs_use_sysroot_for_linker_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             prefix = Path(directory)
-            sysroot_lib = (
-                prefix / "x86_64-conda-linux-gnu" / "sysroot" / "usr" / "lib"
-            )
-            sysroot_lib.mkdir(parents=True)
+            sysroot = prefix / "x86_64-conda-linux-gnu" / "sysroot"
+            sysroot.mkdir(parents=True)
             env = self.config.profiles["static-lean"].environment(
                 {
                     "CONDA_PREFIX": str(prefix),
@@ -352,9 +350,11 @@ class ProfileEnvironmentTests(unittest.TestCase):
             )
         ldflags = env["LDFLAGS"]
         self.assertLess(
-            ldflags.index(f"-L{sysroot_lib}"),
+            ldflags.index(f"-Wl,--sysroot,{sysroot}"),
             ldflags.index("-L/usr/lib/x86_64-linux-gnu"),
         )
+        self.assertNotIn(f"-L{sysroot}", ldflags)
+        self.assertNotIn(f"-I{prefix}/include", env["CPPFLAGS"])
         self.assertNotIn(f"-L{prefix}/lib", ldflags)
         self.assertEqual(env["LD_LIBRARY_PATH"], "/custom/lib")
 
