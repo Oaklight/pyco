@@ -67,10 +67,15 @@ ldflags = "-Wl,--gc-sections -Wl,--build-id=none"
 experimental = true
 
 [profiles."static-lean"]
-description = "Static libpython with Clang -Oz, LLD ICF, hidden symbols, and no unwind tables"
+description = "Static libpython with Clang -Oz, full LTO, LLD ICF, hidden symbols, and no unwind tables"
 cc = "clang"
 cxx = "clang++"
-configure = ["--disable-shared", "--with-ensurepip=install", "--without-doc-strings"]
+configure = [
+  "--disable-shared",
+  "--with-ensurepip=install",
+  "--without-doc-strings",
+  "--with-lto=full",
+]
 cflags = "-Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fno-semantic-interposition"
 cppflags = ""
 cxxflags = "-Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fvisibility-inlines-hidden -fno-semantic-interposition"

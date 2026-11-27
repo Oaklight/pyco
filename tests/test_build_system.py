@@ -96,6 +96,7 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("--gc-sections", lean.ldflags)
         self.assertIn("--disable-shared", static_lean.configure)
         self.assertIn("--without-doc-strings", static_lean.configure)
+        self.assertIn("--with-lto=full", static_lean.configure)
         self.assertEqual(static_lean.cc, "clang")
         self.assertIn("-fno-unwind-tables", static_lean.cflags)
         self.assertIn("-fvisibility=hidden", static_lean.cflags)
