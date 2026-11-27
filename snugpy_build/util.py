@@ -315,6 +315,9 @@ def python_runtime_env(prefix: Path) -> dict[str, str]:
 def git_commit(root: Path) -> str:
     """Return the current Git commit, or a stable marker when unavailable."""
 
+    override = os.environ.get("SNUGPY_COMMIT", "").strip()
+    if override:
+        return override
     result = run_command(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         check=False,

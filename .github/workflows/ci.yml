@@ -16,6 +16,7 @@ concurrency:
 env:
   SNUGPY_VERSION: "3.14"
   SNUGPY_TARGET: "linux-x86_64"
+  SNUGPY_COMMIT: ${{ github.sha }}
 
 jobs:
   unit:
@@ -116,8 +117,6 @@ jobs:
       SNUGPY_CONDA_PREFIX: /opt/snugpy-env
     steps:
       - uses: actions/checkout@v4
-      - name: Trust cached source trees
-        run: git config --global --add safe.directory '*'
       - name: Install build dependencies
         run: |
           apt-get update
@@ -127,6 +126,8 @@ jobs:
             libgdbm-dev libgdbm-compat-dev liblzma-dev libncurses-dev \
             libreadline-dev libsqlite3-dev libssl-dev libzstd-dev tk-dev \
             uuid-dev libbrotli-dev
+      - name: Trust cached source trees
+        run: git config --global --add safe.directory '*'
       - name: Install conda
         run: |
           curl --fail --location --silent --show-error \

@@ -31,10 +31,12 @@ concurrency:
 env:
   SNUGPY_VERSION: "3.14"
   SNUGPY_TARGET: "linux-x86_64"
+  SNUGPY_COMMIT: ${{ github.sha }}
 
 jobs:
   benchmark:
     name: Benchmark ${{ inputs.profile }}
+    if: inputs.profile != 'static-lean'
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -63,14 +65,6 @@ jobs:
         env:
           SNUGPY_CONDA_PREFIX: ${{ runner.temp }}/snugpy-env
         run: ./scripts/install-gdbm-compat.sh "$SNUGPY_CONDA_PREFIX"
-      - name: Install system library headers
-        if: inputs.profile == 'static-lean'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            pkg-config libssl-dev libsqlite3-dev zlib1g-dev liblzma-dev libbz2-dev \
-            libzstd-dev libffi-dev uuid-dev libexpat1-dev libbrotli-dev \
-            libreadline-dev libncurses-dev libgdbm-dev libdb-dev tk-dev
       - name: Full build and measurement
         shell: bash -el {0}
         env:
@@ -94,8 +88,92 @@ jobs:
           ./scripts/package.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET"
           ./scripts/measure.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --runs "$RUNS"
           ./scripts/report.sh
+      - name: Show failure logs
+        if: failure()
+        shell: bash
+        run: |
+          while IFS= read -r -d '' log_file; do
+            echo "===== ${log_file}"
+            tail -80 "${log_file}"
+          done < <(find results -type f -path '*/logs/*.log' -print0)
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snugpy-benchmark-${{ inputs.profile }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            results/**/*.json
+            results/**/logs/*.log
+            results/summary.csv
+            results/report.md
+            dist/*.tar.xz
+
+  static-lean-benchmark:
+    name: Benchmark static-lean (Debian 12)
+    if: inputs.profile == 'static-lean'
+    runs-on: ubuntu-24.04
+    container: debian:bookworm
+    timeout-minutes: 360
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      SNUGPY_CONDA_PREFIX: /opt/snugpy-env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            binutils ca-certificates curl file git gzip make patch pkg-config \
+            xz-utils zlib1g-dev libbz2-dev libdb-dev libexpat1-dev libffi-dev \
+            libgdbm-dev libgdbm-compat-dev liblzma-dev libncurses-dev \
+            libreadline-dev libsqlite3-dev libssl-dev libzstd-dev tk-dev \
+            uuid-dev libbrotli-dev procps
+      - name: Trust cached source trees
+        run: git config --global --add safe.directory '*'
+      - name: Install conda
+        run: |
+          curl --fail --location --silent --show-error \
+            "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" \
+            -o /tmp/miniforge.sh
+          bash /tmp/miniforge.sh -b -p /opt/miniforge3
+          echo "/opt/miniforge3/bin" >> "$GITHUB_PATH"
+      - name: Cache verified CPython sources
+        uses: actions/cache@v4
+        with:
+          path: sources/
+          key: snugpy-sources-${{ hashFiles('configs/versions.toml') }}
+      - name: Create locked conda environment
+        run: |
+          conda create --yes --prefix "$SNUGPY_CONDA_PREFIX" \
+            --file conda-linux-64.lock \
+            --override-channels -c conda-forge
+      - name: Install gdbm ndbm compatibility
+        run: ./scripts/install-gdbm-compat.sh "$SNUGPY_CONDA_PREFIX"
+      - name: Full build and measurement
+        shell: bash
+        env:
+          PROFILE: ${{ inputs.profile }}
+          RUNS: ${{ inputs.runs }}
+          FULL: ${{ inputs.full }}
+          NETWORK: ${{ inputs.network }}
+          TEST_JOBS: "1"
+        run: |
+          export PATH="$SNUGPY_CONDA_PREFIX/bin:$PATH"
+          export PYTHONPATH="$PWD"
+          python --version
+          mode=--smoke
+          network=
+          if [[ "$FULL" == "true" ]]; then mode=--full; fi
+          if [[ "$NETWORK" == "true" ]]; then network=--network; fi
+          ./scripts/fetch.sh "$SNUGPY_VERSION" --zerodep
+          ./scripts/build.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --jobs "$(nproc)"
+          ./scripts/test.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" "$mode" $network --jobs "$TEST_JOBS"
+          ./scripts/package.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET"
+          ./scripts/measure.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --runs "$RUNS"
+          ./scripts/report.sh
       - name: Verify external library ABI
-        if: inputs.profile == 'static-lean'
         run: ./scripts/check-abi.sh "out/v3.14.9/linux-x86_64/static-lean"
       - name: Show failure logs
         if: failure()
