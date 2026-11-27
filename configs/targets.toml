@@ -4,8 +4,8 @@ schema_version = 1
 platform = "linux"
 arch = "x86_64"
 runner = "ubuntu-24.04"
-container_image = "ubuntu:24.04"
-glibc_baseline = "2.34"
+container_image = "debian:bookworm"
+glibc_baseline = "2.36"
 apt_packages = [
   "binutils",
   "build-essential",
@@ -47,4 +47,4 @@ apt_packages = [
   "xz-utils",
   "zlib1g-dev",
 ]
-notes = "Build uses the conda-forge sysroot at glibc 2.34 even though the runner is Ubuntu 24.04. Verify artifact symbol requirements with objdump -T before any release claim."
+notes = "Conda profiles build on the Ubuntu runner. The static-lean profile builds in Debian 12 against system libraries and targets glibc 2.36. Verify artifact symbol requirements with objdump -T before any release claim."

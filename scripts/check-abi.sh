@@ -9,8 +9,8 @@ usage() {
 [[ $# -ge 1 ]] || usage
 root=$1
 shift
-glibc_allowed=2.34
-openssl_allowed=3.0.0
+glibc_allowed=2.36
+openssl_allowed=3.0.9
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--glibc)
