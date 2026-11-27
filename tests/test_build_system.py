@@ -349,11 +349,15 @@ class ProfileEnvironmentTests(unittest.TestCase):
                 }
             )
         ldflags = env["LDFLAGS"]
+        sysroot_lib = sysroot / "usr" / "lib"
         self.assertLess(
             ldflags.index(f"-Wl,--sysroot,{sysroot}"),
+            ldflags.index(f"-L{sysroot_lib}"),
+        )
+        self.assertLess(
+            ldflags.index(f"-L{sysroot_lib}"),
             ldflags.index("-L/usr/lib/x86_64-linux-gnu"),
         )
-        self.assertNotIn(f"-L{sysroot}", ldflags)
         self.assertNotIn(f"-I{prefix}/include", env["CPPFLAGS"])
         self.assertNotIn(f"-L{prefix}/lib", ldflags)
         self.assertEqual(env["LD_LIBRARY_PATH"], "/custom/lib")

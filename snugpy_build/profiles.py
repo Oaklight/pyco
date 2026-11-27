@@ -111,7 +111,11 @@ class ProfileSpec:
             if prefix:
                 sysroot = Path(prefix) / "x86_64-conda-linux-gnu" / "sysroot"
                 if sysroot.is_dir():
-                    _append_flag(environment, "LDFLAGS", f"-Wl,--sysroot,{sysroot}")
+                    _append_flag(
+                        environment,
+                        "LDFLAGS",
+                        f"-Wl,--sysroot,{sysroot} -L{sysroot / 'usr' / 'lib'}",
+                    )
             for library_dir in _SYSTEM_LIBRARY_DIRS:
                 _append_flag(environment, "LDFLAGS", f"-L{library_dir}")
             environment.pop("LIBRARY_PATH", None)
