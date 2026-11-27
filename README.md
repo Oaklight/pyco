@@ -6,10 +6,11 @@ SnugPy builds compact, deployable Python runtimes and measures each candidate
 against a full CPython baseline. It starts from pinned upstream CPython rather
 than reimplementing the language, so compatibility comes first. Every profile
 build preserves the standard library, `ensurepip`, `venv`, `idlelib`, `tkinter`,
-`test`, and optional native extensions. Packaging then derives six deployable
+`test`, and optional native extensions. Packaging then derives seven deployable
 variants from the same stripped tree: `headless`, `headed`, `test`, `micro`,
-`nano`, and `runtime`. The `micro`, `nano`, and `runtime` variants drop the
-installer, headers, docs, and development files for runtime-only sandboxes.
+`nano`, `runtime`, and `runtime-nano`. The `micro`, `nano`, `runtime`, and
+`runtime-nano` variants drop the installer, headers, docs, and development files
+for runtime-only sandboxes.
 
 **Status:** experimental. The build and measurement framework is implemented,
 but no release profile has been approved. GitHub Actions is the build and
@@ -119,7 +120,7 @@ automatically.
 
 ## Distributions
 
-Every profile produces a complete install prefix. Packaging derives six
+Every profile produces a complete install prefix. Packaging derives seven
 archives from one stripped staging tree, so the profile result and all variants
 stay consistent.
 
@@ -131,23 +132,32 @@ stay consistent.
 | `micro` | installer, docs, tests, headers, development files, Tk, curses, dbm, readline | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Stdlib-only agent sandboxes |
 | `nano` | `micro` plus `__pycache__` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Smallest image; imports compile from source |
 | `runtime` | `micro` minus installer, keeps `site-packages` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Agent sandboxes with preinstalled packages |
+| `runtime-nano` | `runtime` plus no `__pycache__` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Smallest agent sandbox with preinstalled packages |
 
 `headless`, `headed`, and `test` keep `include/`, `config-*/Makefile`,
 `ensurepip`, `venv`, and `site-packages`, so `pip install cffi` and `venv`
-work. `micro`, `nano`, and `runtime` are runtime-only: no pip, no venv, no
-headers, no build scripts, no `pydoc_data`, and no test or terminal-UI
-extension modules. `headless` and `headed` drop only the test-only extensions
-(`_test*`, `_ctypes_test`, `xxlimited*`, `xxsubtype`, `_xxtestfuzz`) and keep
-curses and readline. `runtime` keeps `site-packages`, so packages installed at
-image-build time (numpy, pandas, and others) survive; only `pip`,
-`pip-*.dist-info`, `ensurepip`, and `bin/pip*` are removed. `nano` also drops
-precompiled bytecode, so each process compiles modules on first import; expect
-a small startup cost when the runtime filesystem is read-only. Two runtime
-Dockerfiles are provided: `docker/runtime.Dockerfile` for Debian slim and
-`docker/runtime-distroless.Dockerfile` for distroless. The distroless image is
-about 70 MiB, including the interpreter, system libraries, and CA certificates.
-Edit `configs/distributions.toml` to change the variants; the default
-distribution is `headless`.
+work. `micro`, `nano`, `runtime`, and `runtime-nano` are runtime-only: no pip,
+no venv, no headers, no build scripts, no `pydoc_data`, and no test or
+terminal-UI extension modules. `headless` and `headed` drop only the test-only
+extensions (`_test*`, `_ctypes_test`, `xxlimited*`, `xxsubtype`, `_xxtestfuzz`)
+and keep curses and readline. `runtime` keeps `site-packages`, so packages
+installed at image-build time (numpy, pandas, and others) survive; only `pip`,
+`pip-*.dist-info`, `ensurepip`, and `bin/pip*` are removed. `nano` and
+`runtime-nano` also drop precompiled bytecode, so each process compiles modules
+on first import; expect a small startup cost when the runtime filesystem is
+read-only.
+
+Three runtime Dockerfiles are provided:
+
+- `docker/runtime.Dockerfile`: Debian slim, with a shell and apt.
+- `docker/runtime-distroless.Dockerfile`: distroless `cc-debian12`, no shell.
+- `docker/runtime-scratch.Dockerfile`: `scratch` root filesystem with only the
+  required sonames, CA certificates, tzdata, NSS files, and runtime directories.
+
+The scratch image with `runtime-nano` measured 33,484,095 bytes locally, about
+32 MiB. It keeps the standard library, HTTPS, SQLite, `ctypes`, compression
+modules, time zones, and `site-packages`. Edit `configs/distributions.toml` to
+change the variants; the default distribution is `headless`.
 
 Variant names are appended to archive filenames, for example
 `snugpy-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`. The package
@@ -228,9 +238,9 @@ conda-linked profiles as independent matrix jobs with `fail-fast: false`. Each
 job creates its conda environment from `conda-linux-64.lock`, runs fetch, build,
 smoke tests, packaging, and measurement, and uploads its JSON results and
 archives. A separate `static-lean` job runs inside `debian:bookworm`, links
-Debian system libraries, runs the ABI gate, and measures a
-`debian:bookworm-slim` runtime image. An aggregate job downloads all profile
-results and regenerates the report.
+Debian system libraries, and runs the ABI gate. A dependent job measures the
+Debian slim, distroless, scratch `runtime`, and scratch `runtime-nano` images.
+An aggregate job downloads all profile results and regenerates the report.
 
 `.github/workflows/benchmark.yml` is the manual full-regression and repeated
 measurement path. It runs the full CPython suite and zerodep tests with network

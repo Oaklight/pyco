@@ -139,3 +139,41 @@ exclude = [
   "bin/python*-config",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]
+
+[variants.runtime-nano]
+description = "Runtime layout without precompiled bytecode; modules compile on first import."
+exclude = [
+  "lib/python*/test",
+  "lib/python*/idlelib",
+  "lib/python*/tkinter",
+  "lib/python*/lib-dynload/_tkinter*",
+  "lib/python*/ensurepip",
+  "lib/python*/pydoc_data",
+  "lib/python*/unittest",
+  "lib/python*/turtledemo",
+  "lib/python*/venv",
+  "lib/python*/config-*",
+  "lib/python*/lib-dynload/_test*",
+  "lib/python*/lib-dynload/_curses*",
+  "lib/python*/lib-dynload/_dbm*",
+  "lib/python*/lib-dynload/_gdbm*",
+  "lib/python*/lib-dynload/readline*",
+  "lib/python*/lib-dynload/xxlimited*",
+  "lib/python*/lib-dynload/_xxtestfuzz*",
+  "lib/python*/__pycache__",
+  "lib/python*/site-packages/pip",
+  "lib/python*/site-packages/pip-*.dist-info",
+  "lib/python*/site-packages/setuptools",
+  "lib/python*/site-packages/setuptools-*.dist-info",
+  "lib/python*/site-packages/pkg_resources",
+  "lib/python*/site-packages/_distutils_hack",
+  "lib/python*/site-packages/distutils-precedence.pth",
+  "include",
+  "share",
+  "lib/pkgconfig",
+  "lib/libpython*.a",
+  "bin/pip*",
+  "bin/idle*",
+  "bin/python*-config",
+]
+smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]

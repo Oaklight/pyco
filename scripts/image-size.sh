@@ -51,7 +51,13 @@ docker build -q \
 
 bytes=$(docker image inspect "$tag" --format '{{.Size}}')
 docker run --rm --entrypoint python3.14 "$tag" -c \
-	"import ssl, sqlite3, ctypes, json, asyncio; print('runtime-ok')"
+	"import asyncio, bz2, ctypes, hashlib, json, lzma, sqlite3, ssl, uuid, zlib, zoneinfo
+connection = sqlite3.connect(':memory:')
+connection.execute('CREATE TABLE items (value INTEGER)')
+connection.execute('INSERT INTO items VALUES (1)')
+assert connection.execute('SELECT SUM(value) FROM items').fetchone()[0] == 1
+connection.close()
+print('runtime-ok')"
 
 echo "image=$tag"
 echo "dockerfile=$dockerfile"
