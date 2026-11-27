@@ -108,6 +108,12 @@ class ProfileSpec:
             environment["PKG_CONFIG_LIBDIR"] = pkgconfig_dirs
             environment["PKG_CONFIG"] = "/usr/bin/pkg-config"
             environment["PKG_CONFIG_DONT_DEFINE_PREFIX"] = "1"
+            if prefix:
+                sysroot_lib = (
+                    Path(prefix) / "x86_64-conda-linux-gnu" / "sysroot" / "usr" / "lib"
+                )
+                if sysroot_lib.is_dir():
+                    _append_flag(environment, "LDFLAGS", f"-L{sysroot_lib}")
             for library_dir in _SYSTEM_LIBRARY_DIRS:
                 _append_flag(environment, "LDFLAGS", f"-L{library_dir}")
             environment.pop("LIBRARY_PATH", None)
