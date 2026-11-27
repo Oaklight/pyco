@@ -332,6 +332,7 @@ class ProfileEnvironmentTests(unittest.TestCase):
         self.assertNotIn(f"-L{self.prefix}/lib", env["LDFLAGS"])
         self.assertNotIn("LIBRARY_PATH", env)
         self.assertEqual(env["LD_LIBRARY_PATH"], "/custom/lib")
+        self.assertEqual(env["PKG_CONFIG_DONT_DEFINE_PREFIX"], "1")
 
     def test_snugpy_prefix_takes_precedence(self) -> None:
         base = {
