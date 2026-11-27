@@ -99,12 +99,17 @@ Regenerate the lock after an intentional environment change:
 | `static` | GCC `-Os` | `--disable-shared` | Static libpython linkage; not a fully static system binary |
 | `clang-oz` | Clang `-Oz` | shared libpython | Aggressive size experiment |
 | `lean` | Clang `-Oz` | shared libpython, `--without-doc-strings`, `--gc-sections` | Smallest shared experiment; removes C docstrings and unwind tables |
-| `static-lean` | Clang `-Oz` | `--disable-shared`, `--without-doc-strings`, non-PIE, LLD ICF | Static core experiment; non-PIE link, hidden symbols, no unwind tables, section GC |
+| `static-lean` | Clang `-Oz` | `--disable-shared`, `--without-doc-strings`, non-PIE, LLD ICF, Debian 12 system libraries | Smallest deployment core; non-PIE link, hidden symbols, no unwind tables, section GC |
 
 `static-lean` links the interpreter as a non-PIE executable. This removes
 dynamic relocations and shrinks the core, but it disables address-space layout
 randomization for the interpreter process. Use it only where container or VM
-isolation is the security boundary.
+isolation is the security boundary. It is also the only profile linked against
+Debian 12 system libraries instead of conda-forge libraries.
+
+The consolidated profile and distribution sizes are in
+`docs/version-matrix.md`. External library and image details are in
+`docs/runtime-libraries.md`.
 
 Each profile has a separate work tree, install prefix, logs, and result
 directory. A profile is release-eligible only after full CPython regression
@@ -174,18 +179,24 @@ arguments. Use `python -m snugpy_build.cli list` to see the configured values.
   `e02d9ac21cebda6e46435369744a92c65cc7cd8669697694122cf97ffacd1e53`
 - zerodep `v2026.11.20`, commit
   `9f872e8d652272c34600b9fda6448fe4fd4436c3`
-- Target `linux-x86_64`, nominal conda-forge sysroot glibc `2.34`
+- Target `linux-x86_64`
+- conda-forge sysroot glibc `2.34` for the conda-linked profiles
+- Debian 12 system libraries for `static-lean`; measured `GLIBC_2.35`,
+  allowed `GLIBC_2.36`, OpenSSL `3.0`
 - Toolchain: Python `3.12`, GCC `16`, Clang `23`, `lld`, GNU binutils
 
-The conda sysroot is 2.34 even though the CI runner is Ubuntu 24.04. The actual
-symbol requirements of each artifact must be checked with `objdump -T` before
-any portability or release claim. These archives are not general-purpose Linux
+The conda sysroot is 2.34 even though the CI runner is Ubuntu 24.04.
+`static-lean` does not use that sysroot; it builds in `debian:bookworm` and
+links Debian system libraries. The actual symbol requirements of each artifact
+must be checked with `scripts/check-abi.sh` or `objdump -T` before any
+portability or release claim. These archives are not general-purpose Linux
 distributions.
 
-Native extensions link conda-forge libraries such as OpenSSL, SQLite, and
-`libffi`. The archive does not bundle those libraries. Run an extracted artifact
-with the toolchain `lib` directory on `LD_LIBRARY_PATH`, or bundle the required
-libraries before redistribution.
+Native extensions in the conda-linked profiles link conda-forge libraries such
+as OpenSSL, SQLite, and `libffi`. `static-lean` extensions link the Debian
+sonames instead. In both cases the archive does not bundle those libraries. Run
+an extracted artifact with the matching library set available, or bundle the
+required libraries before redistribution.
 
 The conda-forge `gdbm` package omits its ndbm compatibility library. The conda
 setup step builds `libgdbm_compat` from pinned GDBM `1.18` source so both
@@ -209,11 +220,14 @@ results/        metadata per cell; summary.csv and report.md are tracked
 
 ## CI
 
-`.github/workflows/ci.yml` runs the unit checks, then builds the seven profiles
-as independent matrix jobs with `fail-fast: false`. Each job creates its conda
-environment from `conda-linux-64.lock`, runs fetch, build, smoke tests,
-packaging, and measurement, and uploads its JSON results and archives. An
-aggregate job downloads all profile results and regenerates the report.
+`.github/workflows/ci.yml` runs the unit checks, then builds the six
+conda-linked profiles as independent matrix jobs with `fail-fast: false`. Each
+job creates its conda environment from `conda-linux-64.lock`, runs fetch, build,
+smoke tests, packaging, and measurement, and uploads its JSON results and
+archives. A separate `static-lean` job runs inside `debian:bookworm`, links
+Debian system libraries, runs the ABI gate, and measures a
+`debian:bookworm-slim` runtime image. An aggregate job downloads all profile
+results and regenerates the report.
 
 `.github/workflows/benchmark.yml` is the manual full-regression and repeated
 measurement path. It runs the full CPython suite and zerodep tests with network
@@ -222,6 +236,11 @@ access, then packages and measures one selected profile.
 No release workflow is enabled yet. Release selection requires human approval in
 `configs/release-selection.toml` after the compatibility and performance gates
 pass.
+
+## Documentation
+
+- `docs/version-matrix.md`: Python versions, profiles, distributions, and sizes
+- `docs/runtime-libraries.md`: ABI gate, library inventory, and image sizes
 
 ## License
 

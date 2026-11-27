@@ -22,20 +22,32 @@ version in that archive.
 
 ## Linked at runtime
 
-Extension modules are built against conda-forge libraries. The archive does not
-contain those shared libraries; the host or container image must provide them.
+Extension modules in the conda-linked profiles build against conda-forge
+libraries. `static-lean` builds against Debian 12 system libraries. In both
+cases the archive does not contain those shared libraries; the host or
+container image must provide them.
 
 | Component | License | Used by |
 | --- | --- | --- |
 | OpenSSL | Apache-2.0 | `_ssl`, `_hashlib` |
 | SQLite | Public domain | `_sqlite3` |
 | libffi | MIT | `_ctypes` |
+| zlib | zlib license | `zlib`, `binascii`, OpenSSL |
 | bzip2 | bzip2 license | `_bz2` |
 | XZ Utils (liblzma) | 0BSD | `_lzma` |
+| Zstandard | BSD-3-Clause | `_zstd`, OpenSSL |
+| Brotli | MIT | conda OpenSSL builds only; not used by Debian 12 |
+| libuuid | BSD-3-Clause | `_uuid` |
 | ncurses | X11-style | `_curses`, `readline` |
 | GNU Readline | GPL-3.0-or-later | `readline` |
 | GDBM | GPL-3.0-or-later | `_gdbm` |
 | Tcl/Tk | BSD-style | `_tkinter` (headed variant only) |
+
+The Debian packages behind the `static-lean` `runtime` inventory are `libssl3`,
+`libsqlite3-0`, `libffi8`, `zlib1g`, `libbz2-1.0`, `liblzma5`, `libzstd1`, and
+`libuuid1`. Debian's OpenSSL links zstd but not Brotli. The `headless` and
+`headed` variants can additionally need `libncursesw6`, `libreadline8`, and
+`libgdbm6`.
 
 ## Copyleft runtime libraries
 
