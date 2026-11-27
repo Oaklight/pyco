@@ -302,7 +302,7 @@ class ProfileEnvironmentTests(unittest.TestCase):
             "-fno-asynchronous-unwind-tables -fno-ident"
         )
         static_lean_cflags = (
-            "-no-default-config --gcc-toolchain=/usr -Oz "
+            "--no-default-config --gcc-toolchain=/usr -Oz "
             "-ffunction-sections -fdata-sections "
             "-fno-asynchronous-unwind-tables -fno-unwind-tables "
             "-fno-ident -fvisibility=hidden -fno-semantic-interposition"
