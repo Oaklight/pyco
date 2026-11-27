@@ -101,6 +101,7 @@ class ProfileSpec:
             pkgconfig_dirs = ":".join(_SYSTEM_PKGCONFIG_DIRS)
             environment["PKG_CONFIG_PATH"] = pkgconfig_dirs
             environment["PKG_CONFIG_LIBDIR"] = pkgconfig_dirs
+            environment["PKG_CONFIG"] = "/usr/bin/pkg-config"
             environment["PKG_CONFIG_DONT_DEFINE_PREFIX"] = "1"
             environment.pop("LIBRARY_PATH", None)
             excluded_prefixes = [

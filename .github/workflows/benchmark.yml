@@ -68,7 +68,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libssl-dev libsqlite3-dev zlib1g-dev liblzma-dev libbz2-dev \
+            pkg-config libssl-dev libsqlite3-dev zlib1g-dev liblzma-dev libbz2-dev \
             libzstd-dev libffi-dev uuid-dev libexpat1-dev libbrotli-dev \
             libreadline-dev libncurses-dev libgdbm-dev libdb-dev
       - name: Full build and measurement
