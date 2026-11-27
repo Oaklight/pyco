@@ -38,6 +38,11 @@ _SYSTEM_PKGCONFIG_DIRS = (
     "/usr/share/pkgconfig",
 )
 
+_SYSTEM_LIBRARY_DIRS = (
+    "/usr/lib/x86_64-linux-gnu",
+    "/lib/x86_64-linux-gnu",
+)
+
 
 class ProfileError(SnugPyError):
     """Raised for invalid profile configuration."""
@@ -103,6 +108,8 @@ class ProfileSpec:
             environment["PKG_CONFIG_LIBDIR"] = pkgconfig_dirs
             environment["PKG_CONFIG"] = "/usr/bin/pkg-config"
             environment["PKG_CONFIG_DONT_DEFINE_PREFIX"] = "1"
+            for library_dir in _SYSTEM_LIBRARY_DIRS:
+                _append_flag(environment, "LDFLAGS", f"-L{library_dir}")
             environment.pop("LIBRARY_PATH", None)
             excluded_prefixes = [
                 value.rstrip("/")

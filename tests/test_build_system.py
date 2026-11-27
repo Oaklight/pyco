@@ -330,6 +330,8 @@ class ProfileEnvironmentTests(unittest.TestCase):
         )
         self.assertNotIn(f"-I{self.prefix}/include", env["CPPFLAGS"])
         self.assertNotIn(f"-L{self.prefix}/lib", env["LDFLAGS"])
+        self.assertIn("-L/usr/lib/x86_64-linux-gnu", env["LDFLAGS"])
+        self.assertIn("-L/lib/x86_64-linux-gnu", env["LDFLAGS"])
         self.assertNotIn("LIBRARY_PATH", env)
         self.assertEqual(env["LD_LIBRARY_PATH"], "/custom/lib")
         self.assertEqual(env["PKG_CONFIG"], "/usr/bin/pkg-config")
