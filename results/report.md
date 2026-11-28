@@ -1,6 +1,6 @@
 # SnugPy measurement report
 
-Generated: 2026-11-27T06:02:13Z
+Generated: 2026-11-28T00:07:39Z
 
 No compatibility or size claim is valid unless the corresponding build is marked eligible.
 
@@ -19,7 +19,7 @@ No compatibility or size claim is valid unless the corresponding build is marked
 | 3.14.9 | linux-x86_64 | lto | 4,968,224 | 69,716,861 | 10.716 ms | 8,872 | no |
 | 3.14.9 | linux-x86_64 | size | 5,090,400 | 69,929,173 | 9.609 ms | 9,060 | no |
 | 3.14.9 | linux-x86_64 | static | 5,009,472 | 69,850,724 | 9.944 ms | 8,860 | no |
-| 3.14.9 | linux-x86_64 | static-lean | 3,673,432 | 67,457,096 | 9.385 ms | 7,608 | no |
+| 3.14.9 | linux-x86_64 | static-lean | 3,686,520 | 69,146,001 | 13.873 ms | 7,516 | yes |
 
 ## Distribution variants
 
@@ -67,13 +67,13 @@ No compatibility or size claim is valid unless the corresponding build is marked
 | 3.14.9 | linux-x86_64 | static | runtime | 49,799,972 | 6,904,768 | pass |
 | 3.14.9 | linux-x86_64 | static | runtime-nano | 19,542,951 | 4,075,628 | pass |
 | 3.14.9 | linux-x86_64 | static | test | 252,682,093 | 27,520,104 | pass |
-| 3.14.9 | linux-x86_64 | static-lean | headed | 76,423,838 | 12,446,132 | pass |
-| 3.14.9 | linux-x86_64 | static-lean | headless (default) | 67,457,096 | 11,385,808 | pass |
-| 3.14.9 | linux-x86_64 | static-lean | micro | 47,474,820 | 6,557,056 | pass |
-| 3.14.9 | linux-x86_64 | static-lean | nano | 17,228,968 | 3,723,184 | pass |
-| 3.14.9 | linux-x86_64 | static-lean | runtime | 47,474,939 | 6,559,728 | pass |
-| 3.14.9 | linux-x86_64 | static-lean | runtime-nano | 17,229,087 | 3,721,880 | pass |
-| 3.14.9 | linux-x86_64 | static-lean | test | 252,292,201 | 27,271,496 | pass |
+| 3.14.9 | linux-x86_64 | static-lean | headed | 78,112,743 | 12,450,960 | pass |
+| 3.14.9 | linux-x86_64 | static-lean | headless (default) | 69,146,001 | 11,396,640 | pass |
+| 3.14.9 | linux-x86_64 | static-lean | micro | 49,003,849 | 6,568,892 | pass |
+| 3.14.9 | linux-x86_64 | static-lean | nano | 17,244,968 | 3,722,400 | pass |
+| 3.14.9 | linux-x86_64 | static-lean | runtime | 49,003,968 | 6,563,328 | pass |
+| 3.14.9 | linux-x86_64 | static-lean | runtime-nano | 17,245,087 | 3,724,212 | pass |
+| 3.14.9 | linux-x86_64 | static-lean | test | 254,108,716 | 27,283,788 | pass |
 
 ## Baseline deltas
 
@@ -83,11 +83,13 @@ No compatibility or size claim is valid unless the corresponding build is marked
 - lto: -22.18% core vs baseline
 - size: -20.26% core vs baseline
 - static: -21.53% core vs baseline
-- static-lean: -42.46% core vs baseline
+- static-lean: -42.25% core vs baseline
 
 ## Pareto frontier
 
-No eligible build has complete size, startup, and RSS measurements.
+| Profile | Core stripped | Startup | RSS |
+| --- | ---: | ---: | ---: |
+| static-lean | 3,686,520 | 13.873 ms | 7,516 |
 
 ## Failures and missing gates
 
@@ -97,7 +99,6 @@ No eligible build has complete size, startup, and RSS measurements.
 - lto: zerodep tests: skip; cpython regression: skip
 - size: zerodep tests: skip; cpython regression: skip
 - static: zerodep tests: skip; cpython regression: skip
-- static-lean: zerodep tests: skip; cpython regression: skip
 
 ## Measurement notes
 

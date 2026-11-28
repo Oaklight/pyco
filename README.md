@@ -12,9 +12,10 @@ variants from the same stripped tree: `headless`, `headed`, `test`, `micro`,
 `runtime-nano` variants drop the installer, headers, docs, and development files
 for runtime-only sandboxes.
 
-**Status:** experimental. The build and measurement framework is implemented,
-but no release profile has been approved. GitHub Actions is the build and
-verification path.
+**Status:** 0.1.0. `static-lean` on `linux-x86_64` passed the full CPython
+3.14.9 regression suite and the `zerodep` tests with network access. The other
+profiles remain experimental. GitHub Actions is the build, verification, and
+release path.
 
 ## Origin
 
@@ -44,6 +45,10 @@ runtime.
 python -m pip install snugpy
 snugpy list
 ```
+
+The installed CLI reads configuration bundled in the wheel and writes build
+outputs under the current directory. Running from a clone uses that clone's
+`configs/` instead.
 
 ### Docker Hub
 
@@ -194,7 +199,7 @@ Three runtime Dockerfiles are provided:
 - `docker/runtime-scratch.Dockerfile`: `scratch` root filesystem with only the
   required sonames, CA certificates, tzdata, NSS files, and runtime directories.
 
-The scratch image with `runtime-nano` measured 33,484,721 bytes in CI, about
+The scratch image with `runtime-nano` measured 33,500,721 bytes in CI, about
 32 MiB. It keeps the standard library, HTTPS, SQLite, `ctypes`, compression
 modules, time zones, and `site-packages`. Edit `configs/distributions.toml` to
 change the variants; the default distribution is `headless`.
@@ -220,6 +225,8 @@ distribution and lists every variant's installed and archive size separately.
 | `make package PROFILE=size DISTRIBUTION=headless` | Create and test one distribution |
 | `make report` | Write `results/summary.csv` and `results/report.md` |
 | `make matrix` | Run all seven profiles without stopping on unrelated failures |
+| `make images PROFILE=static-lean IMAGE_TAG=0.1.0` | Build the four runtime images locally |
+| `make publish-images PROFILE=static-lean IMAGE_TAG=0.1.0` | Build, smoke-test, and push the images and `latest` |
 | `make clean` | Remove `work/`, `out/`, and `dist/` |
 
 The direct scripts accept `VERSION`, `TARGET`, and `PROFILE` as positional

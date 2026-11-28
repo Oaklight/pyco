@@ -40,9 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `static-lean` now uses safe ICF. Aggressive ICF merged address-taken
   type-slot functions and caused CPython regression failures and crashes.
 - Benchmark and release containers install `netbase`, so service-name
-  resolution tests have `/etc/services` and `/etc/protocols`.
+  resolution tests have `/etc/services` and `/etc/protocols`. The Debian slim
+  runtime image includes `netbase` for the same reason.
 - External-library ABI gate reports missing or unexpected SONAMEs.
 - Packaging preserves deterministic archive metadata and verifies licenses.
+- The Python wheel bundles TOML configuration, so the installed CLI works
+  outside a repository checkout. The release workflow smoke-tests that path
+  before publishing.
 
 ### Known limitations
 

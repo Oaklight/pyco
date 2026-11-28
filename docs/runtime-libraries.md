@@ -110,10 +110,10 @@ the same module and SQLite smoke test. The Debian slim and distroless images use
 
 | Image | Distribution | Final bytes | MiB | Shell | Package manager |
 | --- | --- | ---: | ---: | --- | --- |
-| Debian slim | `runtime` | 129,918,089 | 123.90 | yes | apt |
-| Distroless | `runtime` | 73,808,996 | 70.39 | no | no |
-| Scratch | `runtime` | 63,730,573 | 60.78 | no | no |
-| Scratch | `runtime-nano` | 33,484,721 | 31.93 | no | no |
+| Debian slim | `runtime` | 131,471,769 | 125.38 | yes | apt |
+| Distroless | `runtime` | 75,338,025 | 71.85 | no | no |
+| Scratch | `runtime` | 65,259,602 | 62.24 | no | no |
+| Scratch | `runtime-nano` | 33,500,721 | 31.95 | no | no |
 
 ### Docker Hub tags
 
@@ -141,9 +141,10 @@ SNUGPY_RELEASE=0.1.0 ./scripts/publish-images.sh \
 ### Debian slim
 
 `docker/runtime.Dockerfile` starts from `debian:bookworm-slim`, installs only
-`libssl3` and `libsqlite3-0`, copies the `runtime` distribution to `/opt/snugpy`,
-and sets `PATH`. `libbz2`, `libffi`, `liblzma`, `libuuid`, `libzstd`, and
-`zlib1g` are already present in the slim base image.
+`libssl3`, `libsqlite3-0`, and `netbase`, copies the `runtime` distribution to
+`/opt/snugpy`, and sets `PATH`. `netbase` provides `/etc/services` and
+`/etc/protocols` for service-name resolution. `libbz2`, `libffi`, `liblzma`,
+`libuuid`, `libzstd`, and `zlib1g` are already present in the slim base image.
 
 The Dockerfile uses a multi-stage build:
 
@@ -159,8 +160,8 @@ COPY --from=unpack /opt/snugpy /opt/snugpy
 
 The final image does not include the unpack stage. `ADD` followed by `RUN mv` in
 one stage leaves two copies in the image. The old single-stage Dockerfile
-measured 177,391,776 bytes. The current multi-stage image measures 129,918,089
-bytes, a reduction of 47,473,687 bytes or 26.8%.
+measured 177,391,776 bytes. The current multi-stage image measures 131,471,769
+bytes, a reduction of 45,920,007 bytes or 25.9%.
 
 ### Distroless
 
@@ -185,12 +186,12 @@ The image runs as the distroless `nonroot` user, UID 65532.
 | Component | Bytes |
 | --- | ---: |
 | `gcr.io/distroless/cc-debian12:nonroot` base | 23,667,617 |
-| SnugPy `runtime` installation | 47,474,939 |
+| SnugPy `runtime` installation | 49,003,968 |
 | Copied libraries and layer overhead | 2,666,440 |
-| Final distroless image | 73,808,996 |
+| Final distroless image | 75,338,025 |
 
-The distroless image is 56,109,093 bytes smaller than the Debian slim image, a
-43.2% reduction. It is 58.4% smaller than the original single-stage image.
+The distroless image is 56,133,744 bytes smaller than the Debian slim image, a
+42.7% reduction. It is 57.5% smaller than the original single-stage image.
 
 CI runs the module and SQLite smoke test inside the image. A separate local
 check also passed HTTPS, numpy 2.5.5, and pandas 3.1.1.
@@ -212,17 +213,17 @@ distribution metadata. It runs as UID 65532.
 
 | Distribution | SnugPy installation | Root filesystem | Final image |
 | --- | ---: | ---: | ---: |
-| `runtime` | 47,474,939 | 16,255,634 | 63,730,573 |
-| `runtime-nano` | 17,229,087 | 16,255,634 | 33,484,721 |
+| `runtime` | 49,003,968 | 16,255,634 | 65,259,602 |
+| `runtime-nano` | 17,245,087 | 16,255,634 | 33,500,721 |
 
 The scratch root filesystem costs 16,255,634 bytes. The installed Python tree
 determines the remaining size, so `runtime-nano` is the minimum image for an
 agent sandbox that needs preinstalled packages.
 
-Scratch `runtime` is 10,078,423 bytes smaller than distroless `runtime`, a 13.7%
-reduction. Scratch `runtime-nano` is 40,324,275 bytes smaller than distroless
-`runtime`, a 54.6% reduction. It is 96,433,368 bytes smaller than the Debian
-slim `runtime` image, a 74.2% reduction.
+Scratch `runtime` is 10,078,423 bytes smaller than distroless `runtime`, a 13.4%
+reduction. Scratch `runtime-nano` is 41,837,304 bytes smaller than distroless
+`runtime`, a 55.5% reduction. It is 97,971,048 bytes smaller than the Debian
+slim `runtime` image, a 74.5% reduction.
 
 Local verification inside the scratch image passed:
 
@@ -240,8 +241,9 @@ pandas 3.1.1
 ```
 
 The CI smoke test imports `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio`, `bz2`,
-`hashlib`, `lzma`, `uuid`, `zlib`, and `zoneinfo`, then runs an SQLite query.
-DNS, HTTPS, and numpy/pandas were separate local checks, not CI gates.
+`hashlib`, `lzma`, `socket`, `uuid`, `zlib`, and `zoneinfo`, checks
+`socket.getservbyname("http", "tcp")`, then runs an SQLite query. DNS, HTTPS,
+and numpy/pandas were separate local checks, not CI gates.
 
 `scripts/image-size.sh` selects the Dockerfile with `IMAGE_DOCKERFILE`:
 

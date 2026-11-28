@@ -118,6 +118,8 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
       SNUGPY_CONDA_PREFIX: /opt/snugpy-env
+      PATH: /opt/snugpy-env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -152,21 +154,27 @@ jobs:
             --override-channels -c conda-forge
       - name: Install gdbm ndbm compatibility
         run: ./scripts/install-gdbm-compat.sh "$SNUGPY_CONDA_PREFIX"
-      - name: Build, test, package, and measure
+      - name: Fetch and build
         shell: bash
         run: |
-          export PATH="$SNUGPY_CONDA_PREFIX/bin:$PATH"
-          export PYTHONPATH="$PWD"
           python --version
           ./scripts/fetch.sh "$SNUGPY_VERSION" --zerodep
           ./scripts/build.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
             --jobs "$(nproc)"
+      - name: Run full compatibility gates
+        shell: bash
+        run: |
           ./scripts/test.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
             --full --network --jobs 1
+      - name: Package and measure
+        shell: bash
+        run: |
           ./scripts/package.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET"
           ./scripts/measure.sh "$SNUGPY_VERSION" static-lean "$SNUGPY_TARGET" \
             --runs 5
-          ./scripts/report.sh
+      - name: Generate report
+        shell: bash
+        run: ./scripts/report.sh
       - name: Verify release gates
         run: |
           python - <<'PY'
@@ -238,6 +246,13 @@ jobs:
           python -m pip install --upgrade build twine
           python -m build --outdir python-dist
           python -m twine check python-dist/*
+      - name: Smoke-test installed wheel
+        run: |
+          python -m venv /tmp/snugpy-wheel
+          /tmp/snugpy-wheel/bin/pip install python-dist/*.whl
+          mkdir /tmp/snugpy-cli-smoke
+          cd /tmp/snugpy-cli-smoke
+          /tmp/snugpy-wheel/bin/snugpy list
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

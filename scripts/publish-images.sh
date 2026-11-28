@@ -106,7 +106,8 @@ labels=(
 
 smoke_code=$(
 	cat <<'PY'
-import asyncio, bz2, ctypes, hashlib, json, lzma, sqlite3, ssl, uuid, zlib, zoneinfo
+import asyncio, bz2, ctypes, hashlib, json, lzma, socket, sqlite3, ssl, uuid, zlib, zoneinfo
+assert socket.getservbyname("http", "tcp") == 80
 connection = sqlite3.connect(":memory:")
 connection.execute("CREATE TABLE items (value INTEGER)")
 connection.execute("INSERT INTO items VALUES (1)")
@@ -193,7 +194,7 @@ build_image runtime docker/runtime-distroless.Dockerfile \
 	gcr.io/distroless/cc-debian12:nonroot "$image_prefix:${tag}-distroless"
 build_image runtime docker/runtime.Dockerfile \
 	debian:bookworm-slim "$image_prefix:${tag}-debian" \
-	"PACKAGES=libssl3 libsqlite3-0"
+	"PACKAGES=libssl3 libsqlite3-0 netbase"
 
 if [[ $latest == true ]]; then
 	docker tag "$image_prefix:$tag" "$image_prefix:latest"

@@ -1,7 +1,7 @@
 schema_version = 1
 
 [selection."3.14"."linux-x86_64"]
-profile = ""
-status = "unselected"
-approved = false
-notes = "No profile is release-approved. Select only after compatibility and benchmark gates pass."
+profile = "static-lean"
+status = "approved"
+approved = true
+notes = "0.1.0: full CPython regression and zerodep tests passed on Debian 12; linux-x86_64 only."
