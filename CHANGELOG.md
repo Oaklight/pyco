@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The Python wheel bundles TOML configuration, so the installed CLI works
   outside a repository checkout. The release workflow smoke-tests that path
   before publishing.
+- The release build adds the locked conda environment to `PATH`, so `clang`
+  and the other pinned tools resolve during the build.
 
 ### Known limitations
 

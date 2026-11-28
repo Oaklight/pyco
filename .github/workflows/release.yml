@@ -118,7 +118,6 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
       SNUGPY_CONDA_PREFIX: /opt/snugpy-env
-      PATH: /opt/snugpy-env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
@@ -152,6 +151,7 @@ jobs:
           conda create --yes --prefix "$SNUGPY_CONDA_PREFIX" \
             --file conda-linux-64.lock \
             --override-channels -c conda-forge
+          echo "$SNUGPY_CONDA_PREFIX/bin" >> "$GITHUB_PATH"
       - name: Install gdbm ndbm compatibility
         run: ./scripts/install-gdbm-compat.sh "$SNUGPY_CONDA_PREFIX"
       - name: Fetch and build
