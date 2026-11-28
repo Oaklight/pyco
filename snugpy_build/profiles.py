@@ -7,6 +7,8 @@ try:
 except ModuleNotFoundError:  # Python 3.10
     import tomli as tomllib
 
+import platform
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -32,16 +34,74 @@ _CONTAMINATING_FLAGS = (
 )
 
 
-_SYSTEM_PKGCONFIG_DIRS = (
-    "/usr/lib/x86_64-linux-gnu/pkgconfig",
-    "/usr/lib/pkgconfig",
-    "/usr/share/pkgconfig",
-)
+def _system_architecture() -> str:
+    """Return the Debian multiarch tuple for the build host."""
 
-_SYSTEM_LIBRARY_DIRS = (
-    "/usr/lib/x86_64-linux-gnu",
-    "/lib/x86_64-linux-gnu",
-)
+    machine = platform.machine().lower()
+    if machine in {"aarch64", "arm64"}:
+        return "aarch64-linux-gnu"
+    return "x86_64-linux-gnu"
+
+
+def _system_pkgconfig_dirs() -> tuple[str, ...]:
+    architecture = _system_architecture()
+    return (
+        f"/usr/lib/{architecture}/pkgconfig",
+        "/usr/lib/pkgconfig",
+        "/usr/share/pkgconfig",
+    )
+
+
+def _system_library_dirs() -> tuple[str, ...]:
+    architecture = _system_architecture()
+    return (f"/usr/lib/{architecture}", f"/lib/{architecture}")
+
+
+def _apply_darwin_homebrew_environment(environment: dict[str, str]) -> None:
+    """Add keg-only Homebrew headers, libraries, and pkg-config files."""
+
+    prefix = Path(
+        environment.get("HOMEBREW_PREFIX")
+        or ("/opt/homebrew" if platform.machine() == "arm64" else "/usr/local")
+    )
+    if not prefix.is_dir():
+        return
+    include_dirs: list[str] = []
+    library_dirs: list[str] = []
+    pkgconfig_dirs: list[str] = []
+    for formula in (
+        "openssl@3",
+        "readline",
+        "sqlite",
+        "xz",
+        "bzip2",
+        "zlib",
+        "libffi",
+        "expat",
+        "zstd",
+    ):
+        root = prefix / "opt" / formula
+        include = root / "include"
+        library = root / "lib"
+        pkgconfig = library / "pkgconfig"
+        if include.is_dir():
+            include_dirs.append(str(include))
+        if library.is_dir():
+            library_dirs.append(str(library))
+        if pkgconfig.is_dir():
+            pkgconfig_dirs.append(str(pkgconfig))
+    for directory in include_dirs:
+        _append_flag(environment, "CPPFLAGS", f"-I{directory}")
+    for directory in library_dirs:
+        _append_flag(environment, "LDFLAGS", f"-L{directory} -Wl,-rpath,{directory}")
+    if pkgconfig_dirs:
+        existing = environment.get("PKG_CONFIG_PATH", "").strip()
+        entries = pkgconfig_dirs + ([existing] if existing else [])
+        environment["PKG_CONFIG_PATH"] = ":".join(entries)
+    if library_dirs:
+        existing = environment.get("DYLD_LIBRARY_PATH", "").strip()
+        entries = library_dirs + ([existing] if existing else [])
+        environment["DYLD_LIBRARY_PATH"] = ":".join(entries)
 
 
 class ProfileError(SnugPyError):
@@ -102,13 +162,16 @@ class ProfileSpec:
         prefix = environment.get("SNUGPY_CONDA_PREFIX") or environment.get(
             "CONDA_PREFIX"
         )
-        if self.external_libs == "system":
-            pkgconfig_dirs = ":".join(_SYSTEM_PKGCONFIG_DIRS)
+        if self.external_libs == "environment":
+            if sys.platform == "darwin":
+                _apply_darwin_homebrew_environment(environment)
+        elif self.external_libs == "system":
+            pkgconfig_dirs = ":".join(_system_pkgconfig_dirs())
             environment["PKG_CONFIG_PATH"] = pkgconfig_dirs
             environment["PKG_CONFIG_LIBDIR"] = pkgconfig_dirs
             environment["PKG_CONFIG"] = "/usr/bin/pkg-config"
             environment["PKG_CONFIG_DONT_DEFINE_PREFIX"] = "1"
-            for library_dir in _SYSTEM_LIBRARY_DIRS:
+            for library_dir in _system_library_dirs():
                 _append_flag(environment, "LDFLAGS", f"-L{library_dir}")
             environment.pop("LIBRARY_PATH", None)
             excluded_prefixes = [
@@ -189,7 +252,7 @@ def load_profiles(path: Path) -> dict[str, ProfileSpec]:
             raise ProfileError(
                 f"{path}: profile {name!r} has a malformed configure flag"
             )
-        if profile.external_libs not in {"conda", "system"}:
+        if profile.external_libs not in {"conda", "environment", "system"}:
             raise ProfileError(
                 f"{path}: profile {name!r} has an invalid external_libs value"
             )

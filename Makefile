@@ -20,7 +20,7 @@ all: check
 help:
 	@echo "Available targets:"
 	@echo "  conda       - Create or update the conda toolchain at CONDA_PREFIX"
-	@echo "  lock        - Regenerate conda-linux-64.lock from CONDA_PREFIX"
+	@echo "  lock        - Regenerate the platform conda lock file from CONDA_PREFIX"
 	@echo "  check       - Run unit tests, compileall, ShellCheck, and shfmt"
 	@echo "  fetch       - Download and verify pinned CPython and zerodep sources"
 	@echo "  build       - Build one PROFILE for VERSION and TARGET"

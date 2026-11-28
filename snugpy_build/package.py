@@ -8,6 +8,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
@@ -35,6 +36,15 @@ _ET_REL = 1
 _ET_EXEC = 2
 _ET_DYN = 3
 
+_MACHO_MAGICS = {
+    b"\xfe\xed\xfa\xce",
+    b"\xce\xfa\xed\xfe",
+    b"\xfe\xed\xfa\xcf",
+    b"\xcf\xfa\xed\xfe",
+    b"\xca\xfe\xba\xbe",
+    b"\xbe\xba\xfe\xca",
+}
+
 _ROOT_LICENSE_FILES = ("LICENSE", "THIRD_PARTY_LICENSES.md")
 _LICENSE_DIR = "licenses"
 _REQUIRED_LICENSE_FILES = (
@@ -58,6 +68,16 @@ def _elf_type(path: Path) -> int | None:
     return int.from_bytes(header[16:18], byteorder)
 
 
+def _is_macho(path: Path) -> bool:
+    """Return True when path has a Mach-O or universal Mach-O header."""
+
+    try:
+        with path.open("rb") as handle:
+            return handle.read(4) in _MACHO_MAGICS
+    except OSError:
+        return False
+
+
 def _is_archive(path: Path) -> bool:
     try:
         with path.open("rb") as handle:
@@ -78,9 +98,20 @@ def _tree_bytes(root: Path, exclude: Callable[[str], bool] | None = None) -> int
     return total
 
 
-def _strip_tree(root: Path) -> dict[str, Any]:
-    """Strip executable and shared ELF files in a staged install tree."""
+def _strip_tree(root: Path, platform: str) -> dict[str, Any]:
+    """Strip ELF or Mach-O files in a staged install tree."""
 
+    if platform == "windows":
+        return {
+            "format": "pe",
+            "files": 0,
+            "binaries": 0,
+            "objects_and_archives": 0,
+            "bytes_before": 0,
+            "bytes_after": 0,
+            "bytes_saved": 0,
+            "skipped": "PE stripping is not enabled",
+        }
     strip = shutil.which("strip")
     if strip is None:
         raise PackageError("strip was not found on PATH")
@@ -98,9 +129,12 @@ def _strip_tree(root: Path) -> dict[str, Any]:
             if kind in {_ET_EXEC, _ET_DYN}:
                 options = ["--strip-unneeded"]
                 binaries += 1
-            elif kind == _ET_REL or _is_archive(path):
+            elif kind == _ET_REL or (platform == "linux" and _is_archive(path)):
                 options = ["--strip-debug"]
                 objects += 1
+            elif platform == "macos" and _is_macho(path):
+                options = ["-x"]
+                binaries += 1
             else:
                 continue
             size_before = path.stat().st_size
@@ -110,8 +144,9 @@ def _strip_tree(root: Path) -> dict[str, Any]:
             after += size_after
     count = binaries + objects
     if count == 0:
-        raise PackageError("no ELF files or static archives found to strip")
+        raise PackageError("no ELF or Mach-O files found to strip")
     return {
+        "format": "macho" if platform == "macos" else "elf",
         "files": count,
         "binaries": binaries,
         "objects_and_archives": objects,
@@ -324,12 +359,18 @@ def package(spec: BuildSpec, *, only: Sequence[str] | None = None) -> dict[str, 
         )
         license_files = _install_license_files(staging, paths.root, paths.source)
         log(f"installed {len(license_files)} license files")
-        strip = _strip_tree(staging)
-        log(f"stripped {strip['files']} ELF files: {strip['bytes_saved']} bytes saved")
+        strip = _strip_tree(staging, spec.target.platform)
+        if strip.get("skipped"):
+            log(f"skipped stripping: {strip['skipped']}")
+        else:
+            log(
+                f"stripped {strip['files']} {strip['format']} files: "
+                f"{strip['bytes_saved']} bytes saved"
+            )
         for variant in selected:
             archive = paths.package_archive_for(variant.name)
             arc_root = f"{base_root}-{variant.name}"
-            exclude = variant.matches_exclude
+            exclude = partial(variant.matches_exclude, platform=spec.target.platform)
             installed_bytes = _tree_bytes(staging, exclude)
             _build_archive(staging, archive, arc_root, exclude=exclude)
             digest = sha256_file(archive)

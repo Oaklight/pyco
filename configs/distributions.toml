@@ -17,6 +17,8 @@ exclude = [
   "lib/libpython*.a",
   "lib/python*/config-*/python.o",
   "bin/idle*",
+  "libs",
+  "tcl",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes"]
 
@@ -32,6 +34,7 @@ exclude = [
   "lib/python*/config-*/libpython*.a",
   "lib/libpython*.a",
   "lib/python*/config-*/python.o",
+  "libs",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes", "tkinter"]
 
@@ -68,6 +71,8 @@ exclude = [
   "bin/pip*",
   "bin/idle*",
   "bin/python*-config",
+  "libs",
+  "tcl",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]
 
@@ -100,6 +105,8 @@ exclude = [
   "bin/pip*",
   "bin/idle*",
   "bin/python*-config",
+  "libs",
+  "tcl",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]
 
@@ -137,6 +144,8 @@ exclude = [
   "bin/pip*",
   "bin/idle*",
   "bin/python*-config",
+  "libs",
+  "tcl",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]
 
@@ -175,5 +184,7 @@ exclude = [
   "bin/pip*",
   "bin/idle*",
   "bin/python*-config",
+  "libs",
+  "tcl",
 ]
 smoke_imports = ["ssl", "sqlite3", "ctypes", "json", "asyncio"]

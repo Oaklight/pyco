@@ -7,6 +7,7 @@ import platform
 import re
 import shlex
 import shutil
+import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -39,6 +40,7 @@ DRY_RUN_ENV_KEYS = (
     "PKG_CONFIG_PATH",
     "LIBRARY_PATH",
     "LD_LIBRARY_PATH",
+    "DYLD_LIBRARY_PATH",
 )
 
 
@@ -83,7 +85,10 @@ def _flag_tokens_applied(flags: str, effective: dict[str, str]) -> bool:
 
 
 def _first_line(cmd: list[str]) -> str:
-    result = run_command(cmd, check=False)
+    try:
+        result = run_command(cmd, check=False)
+    except OSError:
+        return ""
     text = result.output.strip()
     return text.splitlines()[0] if text else ""
 
@@ -149,24 +154,93 @@ def _apply_patches(spec: BuildSpec, work_src: Path, logs_dir: Path) -> list[str]
     return applied
 
 
-def _set_install_rpath(paths: BuildPaths, python: Path) -> str:
-    """Make the installed interpreter find libpython relative to its prefix."""
+def _is_macho(path: Path) -> bool:
+    """Return True when a file has a Mach-O or universal Mach-O header."""
 
-    rpath = "$ORIGIN/../lib"
-    target = python.resolve()
-    if not is_elf(target):
-        raise BuildError(f"installed interpreter is not an ELF file: {target}")
-    patchelf = shutil.which("patchelf")
-    if not patchelf:
-        raise BuildError("patchelf was not found on PATH")
-    result = run_command(
-        [patchelf, "--set-rpath", rpath, str(target)],
-        log_path=paths.logs_dir / "rpath.log",
+    try:
+        with path.open("rb") as handle:
+            magic = handle.read(4)
+    except OSError:
+        return False
+    return magic in {
+        b"\xfe\xed\xfa\xce",
+        b"\xce\xfa\xed\xfe",
+        b"\xfe\xed\xfa\xcf",
+        b"\xcf\xfa\xed\xfe",
+        b"\xca\xfe\xba\xbe",
+        b"\xbe\xba\xfe\xca",
+    }
+
+
+def _set_macos_rpath(paths: BuildPaths, python: Path) -> str:
+    """Make a shared macOS interpreter locate libpython inside its prefix."""
+
+    otool = shutil.which("otool")
+    install_name_tool = shutil.which("install_name_tool")
+    if not otool or not install_name_tool:
+        raise BuildError("macOS install_name_tool and otool are required")
+    linked = run_command(
+        [otool, "-L", str(python)],
+        log_path=paths.logs_dir / "otool.log",
         check=False,
     )
-    if result.returncode != 0:
-        raise BuildError(f"patchelf failed; see {result.log_path}")
-    return rpath
+    if linked.returncode != 0:
+        raise BuildError(f"otool failed; see {linked.log_path}")
+    libpython = next(
+        (
+            line.strip().split(" (", 1)[0]
+            for line in linked.output.splitlines()[1:]
+            if "libpython" in line
+        ),
+        None,
+    )
+    if libpython is None:
+        return "not-required-macho"
+    library = Path(libpython)
+    replacement = f"@rpath/{library.name}"
+    commands = [
+        [install_name_tool, "-change", libpython, replacement, str(python)],
+        [
+            install_name_tool,
+            "-add_rpath",
+            "@executable_path/../lib",
+            str(python),
+        ],
+        [install_name_tool, "-id", replacement, str(library)],
+    ]
+    for index, command in enumerate(commands, start=1):
+        result = run_command(
+            command,
+            log_path=paths.logs_dir / f"rpath-{index:02d}.log",
+            check=False,
+        )
+        if result.returncode != 0:
+            if "-add_rpath" in command and "would duplicate path" in result.output:
+                continue
+            raise BuildError(f"install_name_tool failed; see {result.log_path}")
+    return "@executable_path/../lib"
+
+
+def _set_install_rpath(paths: BuildPaths, python: Path) -> str:
+    """Make the installed interpreter locate libpython relative to its prefix."""
+
+    target = python.resolve()
+    if is_elf(target):
+        rpath = "$ORIGIN/../lib"
+        patchelf = shutil.which("patchelf")
+        if not patchelf:
+            raise BuildError("patchelf was not found on PATH")
+        result = run_command(
+            [patchelf, "--set-rpath", rpath, str(target)],
+            log_path=paths.logs_dir / "rpath.log",
+            check=False,
+        )
+        if result.returncode != 0:
+            raise BuildError(f"patchelf failed; see {result.log_path}")
+        return rpath
+    if _is_macho(target):
+        return _set_macos_rpath(paths, target)
+    return "not-applicable"
 
 
 def _config_probe(python: Path, prefix: Path) -> dict[str, Any]:
@@ -198,6 +272,13 @@ def _verify_installed_build(
     spec: BuildSpec, paths: BuildPaths, effective_flags: dict[str, str]
 ) -> dict[str, Any]:
     """Check that the installed runtime used the requested profile."""
+
+    if spec.target.build_backend == "pcbuild":
+        python = find_python(paths.prefix, spec.version.version)
+        return {
+            "python": str(python),
+            "config": _config_probe(python, paths.prefix),
+        }
 
     if not _flag_tokens_applied(spec.profile.cflags, effective_flags):
         raise BuildError(
@@ -285,20 +366,60 @@ def build(
     paths = BuildPaths(spec)
 
     jobs = jobs or max(1, os.cpu_count() or 1)
-    configure_cmd = [
-        str(paths.work_src / "configure"),
-        f"--prefix={paths.prefix}",
-        *spec.profile.configure,
-    ]
-    build_cmd = ["make", f"-j{jobs}"]
-    install_cmd = ["make", "install"]
     env = spec.profile.environment(os.environ)
+    configure_cmd: list[str] | None = None
+    if spec.target.build_backend == "pcbuild":
+        platform_name = {"x86_64": "x64", "arm64": "ARM64"}[spec.target.arch]
+        batch = paths.work_src / "PCbuild" / "build.bat"
+        build_cmd = [
+            "cmd.exe",
+            "/d",
+            "/c",
+            str(batch),
+            "-p",
+            platform_name,
+            "-c",
+            "Release",
+            "-m",
+        ]
+        layout_arch = {"x86_64": "amd64", "arm64": "arm64"}[spec.target.arch]
+        layout = paths.work_src / "PC" / "layout" / "__main__.py"
+        install_cmd = [
+            sys.executable,
+            str(layout),
+            "--source",
+            str(paths.work_src),
+            "--build",
+            str(paths.build_dir),
+            "--arch",
+            layout_arch,
+            "--copy",
+            str(paths.prefix),
+            "--include-stable",
+            "--include-pip",
+            "--include-tcltk",
+            "--include-idle",
+            "--include-tests",
+            "--include-venv",
+            "--include-dev",
+        ]
+    else:
+        configure_cmd = [
+            str(paths.work_src / "configure"),
+            f"--prefix={paths.prefix}",
+            *spec.profile.configure,
+        ]
+        build_cmd = ["make", f"-j{jobs}"]
+        install_cmd = ["make", "install"]
 
     if dry_run:
         print(f"source: {paths.source}")
         print(f"work: {paths.work_root}")
         print(f"prefix: {paths.prefix}")
-        print(f"configure: {shlex.join(configure_cmd)}")
+        print(f"backend: {spec.target.build_backend}")
+        print(
+            f"configure: {shlex.join(configure_cmd) if configure_cmd else '(not used)'}"
+        )
         print("environment:")
         for name in DRY_RUN_ENV_KEYS:
             if name in env:
@@ -319,10 +440,10 @@ def build(
     remove_tree(paths.work_root)
     remove_tree(paths.prefix)
     remove_tree(paths.results_dir)
-    paths.build_dir.mkdir(parents=True, exist_ok=True)
     paths.prefix.mkdir(parents=True, exist_ok=True)
     paths.logs_dir.mkdir(parents=True, exist_ok=True)
     copy_tree(paths.source, paths.work_src)
+    paths.build_dir.mkdir(parents=True, exist_ok=True)
 
     started_at = utc_now()
     started = time.monotonic()
@@ -342,18 +463,19 @@ def build(
 
     try:
         patches = _apply_patches(spec, paths.work_src, paths.logs_dir)
-        log(f"configuring {spec.profile.name}")
-        configured = run_command(
-            configure_cmd,
-            cwd=paths.build_dir,
-            env=env,
-            log_path=paths.logs_dir / "configure.log",
-            check=False,
-        )
-        if configured.returncode != 0:
-            raise BuildError(f"configure failed; see {configured.log_path}")
+        if configure_cmd is not None:
+            log(f"configuring {spec.profile.name}")
+            configured = run_command(
+                configure_cmd,
+                cwd=paths.build_dir,
+                env=env,
+                log_path=paths.logs_dir / "configure.log",
+                check=False,
+            )
+            if configured.returncode != 0:
+                raise BuildError(f"configure failed; see {configured.log_path}")
 
-        effective_flags = _flags_in_makefile(paths.build_dir / "Makefile")
+            effective_flags = _flags_in_makefile(paths.build_dir / "Makefile")
         log(f"building {spec.profile.name} with {jobs} jobs")
         built = run_command(
             build_cmd,
@@ -367,13 +489,18 @@ def build(
 
         log(f"installing into {paths.prefix}")
         install_env = python_runtime_env(paths.prefix)
-        existing_library_path = install_env.get("LD_LIBRARY_PATH", "")
-        install_env["LD_LIBRARY_PATH"] = str(paths.build_dir) + (
-            f":{existing_library_path}" if existing_library_path else ""
-        )
+        for name in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
+            if name not in install_env and not (
+                name == "DYLD_LIBRARY_PATH" and sys.platform == "darwin"
+            ):
+                continue
+            existing_library_path = install_env.get(name, "")
+            install_env[name] = str(paths.build_dir) + (
+                f":{existing_library_path}" if existing_library_path else ""
+            )
         installed_result = run_command(
             install_cmd,
-            cwd=paths.build_dir,
+            cwd=paths.build_dir if configure_cmd is not None else paths.work_src,
             env=install_env,
             log_path=paths.logs_dir / "install.log",
             check=False,

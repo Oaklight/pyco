@@ -1,0 +1,38 @@
+name: snugpy
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - clang
+  - clangxx
+  - lld
+  - llvm-tools
+  - make
+  - patch
+  - pkg-config
+  - git
+  - rsync
+  - file
+  - tar
+  - gzip
+  - xz
+  - bzip2
+  - zlib
+  - openssl
+  - sqlite
+  - readline
+  - ncurses
+  - tk
+  - libffi
+  - gdbm
+  - expat
+  - zstd
+  - libmpdec
+  - hyperfine
+  - shellcheck
+  - go-shfmt
+  - pytest
+  - pytest-asyncio
+  - pytest-benchmark

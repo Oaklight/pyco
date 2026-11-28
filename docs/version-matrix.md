@@ -1,8 +1,9 @@
 # Version and distribution matrix
 
 This page is the consolidated inventory of everything SnugPy currently builds.
-It covers one pinned CPython version and one target. A new CPython minor
-version is a separate build matrix, not a configuration switch.
+It covers one pinned CPython version and five native target definitions; only
+`linux-x86_64` is release-approved. A new CPython minor version is a separate
+build matrix, not a configuration switch.
 
 Snapshot source:
 
@@ -10,8 +11,10 @@ Snapshot source:
 - `static-lean` metrics, image sizes, and release gate: benchmark run
   `46067091932`, commit `9e6fc6b`
 - CPython `3.14.9`
-- Target `linux-x86_64`
-- Profiles: seven
+- Release target `linux-x86_64`
+- Native build targets: `linux-arm64`, `macos-arm64`, `macos-x86_64`,
+  `windows-x86_64`
+- Profiles: nine
 - Distributions: seven per profile
 
 ## Supported Python versions
@@ -30,15 +33,18 @@ archive, build prefix, extension ABI, and release decision.
 
 ## Platforms
 
-| Platform | Status |
-| --- | --- |
-| `linux-x86_64` | Built |
-| `linux-aarch64` | Not started |
-| macOS | Not started |
-| Windows | Not started |
+| Platform | Runner | Status |
+| --- | --- | --- |
+| `linux-x86_64` | `ubuntu-24.04` | Built, fully tested, release-approved |
+| `linux-arm64` | `ubuntu-24.04-arm` | Native CI build configured; release approval pending |
+| `macos-arm64` | `macos-15` | Native CI build configured; release approval pending |
+| `macos-x86_64` | `macos-15-intel` | Native CI build configured; release approval pending |
+| `windows-x86_64` | `windows-2025` | Native CI build configured; release approval pending |
 
-`static-lean` is built inside `debian:bookworm`. The other profiles build on
-the Ubuntu 24.04 runner against conda-forge libraries.
+Linux `static-lean` is built inside `debian:bookworm`; Linux ARM64 uses the same
+container on an ARM64 runner. macOS uses native Clang and Homebrew dependencies.
+Windows uses CPython `PCbuild` and `PC/layout` with MSVC. Docker is used only
+for Linux.
 
 ## Build profiles
 

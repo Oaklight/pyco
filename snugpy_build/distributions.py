@@ -30,19 +30,42 @@ class DistributionVariant:
     exclude: tuple[str, ...]
     smoke_imports: tuple[str, ...]
 
-    def matches_exclude(self, relative: str) -> bool:
+    def matches_exclude(self, relative: str, platform: str = "linux") -> bool:
         """Return whether a prefix-relative path belongs to an excluded tree.
 
         Patterns match a path component by component. A pattern that matches a
-        directory therefore excludes every file below that directory.
+        directory therefore excludes every file below that directory. Windows
+        layouts use ``Lib``, ``DLLs``, and ``Scripts`` at the prefix root, so
+        those roots are mapped to the POSIX layout before matching.
         """
 
-        parts = relative.split("/")
+        normalized = relative.replace("\\", "/")
+        if platform == "windows":
+            normalized = _normalize_windows_layout(normalized)
+        parts = normalized.split("/")
         for pattern in self.exclude:
             for index in range(1, len(parts) + 1):
                 if fnmatchcase("/".join(parts[:index]), pattern):
                     return True
         return False
+
+
+def _normalize_windows_layout(relative: str) -> str:
+    """Map a Windows CPython layout path onto the Unix layout vocabulary."""
+
+    parts = relative.split("/")
+    if not parts:
+        return relative
+    root = parts[0].lower()
+    if root == "lib":
+        return "/".join(["lib", "python", *parts[1:]])
+    if root == "dlls":
+        return "/".join(["lib", "python", "lib-dynload", *parts[1:]])
+    if root == "scripts":
+        return "/".join(["bin", *parts[1:]])
+    if root == "libs":
+        return "/".join(["lib", *parts[1:]])
+    return relative
 
 
 @dataclass(frozen=True)

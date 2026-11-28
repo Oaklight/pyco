@@ -41,17 +41,24 @@ def _stdlib_root(prefix: Path) -> Path:
     for candidate in candidates:
         if candidate.is_dir():
             return candidate
-    raise MetricsError(f"no stdlib directory found under {prefix / 'lib'}")
+    windows_lib = prefix / "Lib"
+    if windows_lib.is_dir():
+        return windows_lib
+    raise MetricsError(f"no stdlib directory found under {prefix}")
 
 
 def _core_files(prefix: Path, version: str) -> list[Path]:
     python = find_python(prefix, version)
     files = [python]
-    library_dir = prefix / "lib"
-    if library_dir.exists():
+    for library_dir in (prefix / "lib", prefix):
+        if not library_dir.exists():
+            continue
         for path, _ in iter_unique_regular_files(
             library_dir,
-            lambda item: item.name.startswith("libpython") and ".so" in item.name,
+            lambda item: (
+                item.name.startswith(("libpython", "python"))
+                and item.suffix in {".so", ".dylib", ".dll"}
+            ),
         ):
             files.append(path)
     return sorted(set(files))
@@ -85,8 +92,31 @@ def _extension_predicate(root: Path) -> Callable[[Path], bool]:
 
 
 def _ldd(binary: Path, env: dict[str, str] | None = None) -> list[dict[str, Any]]:
-    result = run_command(["ldd", str(binary)], env=env, check=False)
-    libraries: list[dict[str, Any]] = []
+    """Return linked libraries using ldd on Linux and otool on macOS."""
+
+    otool = shutil.which("otool")
+    if otool is not None:
+        try:
+            result = run_command([otool, "-L", str(binary)], env=env, check=False)
+        except OSError:
+            return []
+        libraries: list[dict[str, Any]] = []
+        for line in result.output.splitlines()[1:]:
+            path_text = line.strip().split(" (", 1)[0]
+            if not path_text:
+                continue
+            path = Path(path_text)
+            try:
+                size = path.stat().st_size
+            except OSError:
+                size = 0
+            libraries.append({"name": path.name, "path": str(path), "bytes": size})
+        return libraries
+    try:
+        result = run_command(["ldd", str(binary)], env=env, check=False)
+    except OSError:
+        return []
+    libraries = []
     for line in result.output.splitlines():
         line = line.strip()
         if not line or "=>" not in line:

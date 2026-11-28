@@ -31,6 +31,8 @@ from snugpy_build.package import (  # noqa: E402
     _build_archive,
     _elf_type,
     _install_license_files,
+    _is_macho,
+    _strip_tree,
 )
 from snugpy_build.paths import BuildPaths  # noqa: E402
 from snugpy_build.report import _row, _write_report  # noqa: E402
@@ -57,7 +59,17 @@ class ConfigTests(unittest.TestCase):
     def test_expected_profiles_exist(self) -> None:
         self.assertEqual(
             set(self.config.profiles),
-            {"baseline", "size", "lto", "static", "clang-oz", "lean", "static-lean"},
+            {
+                "baseline",
+                "size",
+                "lto",
+                "static",
+                "clang-oz",
+                "lean",
+                "static-lean",
+                "macos-static",
+                "windows-release",
+            },
         )
 
     def test_version_pin_is_immutable(self) -> None:
@@ -79,7 +91,17 @@ class ConfigTests(unittest.TestCase):
 
     def test_unknown_target_fails(self) -> None:
         with self.assertRaises(ConfigError):
-            self.config.resolve("3.14", "baseline", "windows-x86_64")
+            self.config.resolve("3.14", "baseline", "plan9-x86_64")
+
+    def test_native_target_backends(self) -> None:
+        self.assertEqual(self.config.targets["linux-arm64"].runner, "ubuntu-24.04-arm")
+        self.assertEqual(self.config.targets["macos-arm64"].runner, "macos-15")
+        self.assertEqual(self.config.targets["macos-x86_64"].runner, "macos-15-intel")
+        self.assertEqual(self.config.targets["windows-x86_64"].build_backend, "pcbuild")
+        macos = self.config.resolve("3.14", "macos-static", "macos-arm64")
+        windows = self.config.resolve("3.14", "windows-release", "windows-x86_64")
+        self.assertEqual(macos.target.platform, "macos")
+        self.assertEqual(windows.target.build_backend, "pcbuild")
 
     def test_static_and_lto_profiles(self) -> None:
         static = self.config.profiles["static"]
@@ -252,6 +274,27 @@ class DistributionTests(unittest.TestCase):
         headed = self.distributions.get("headed")
         self.assertFalse(headed.matches_exclude("lib/python3.14/tkinter/__init__.py"))
         self.assertTrue(headed.matches_exclude("lib/python3.14/test/test_abc.py"))
+
+    def test_windows_layout_is_normalized_for_excludes(self) -> None:
+        headless = self.distributions.get("headless")
+        self.assertTrue(
+            headless.matches_exclude("Lib/test/test_abc.py", platform="windows")
+        )
+        self.assertTrue(
+            headless.matches_exclude(
+                "DLLs/_tkinter.cp314-win_amd64.pyd", platform="windows"
+            )
+        )
+        self.assertTrue(
+            headless.matches_exclude("Scripts/idle.exe", platform="windows")
+        )
+        self.assertFalse(
+            headless.matches_exclude("Lib/json/__init__.py", platform="windows")
+        )
+        micro = self.distributions.get("micro")
+        self.assertTrue(
+            micro.matches_exclude("Lib/site-packages/pip/__init__.py", "windows")
+        )
 
     def test_test_variant_excludes_nothing(self) -> None:
         full = self.distributions.get("test")
@@ -473,6 +516,20 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(_elf_type(path), 1)
             path.write_bytes(b"not elf")
             self.assertIsNone(_elf_type(path))
+
+    def test_macho_header_is_recognized(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "payload"
+            path.write_bytes(b"\xcf\xfa\xed\xfe" + b"\x00" * 16)
+            self.assertTrue(_is_macho(path))
+            path.write_bytes(b"\x7fELF")
+            self.assertFalse(_is_macho(path))
+
+    def test_windows_strip_is_explicitly_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result = _strip_tree(Path(directory), "windows")
+            self.assertEqual(result["format"], "pe")
+            self.assertIn("skipped", result)
 
     def test_xz_archive_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

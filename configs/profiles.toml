@@ -77,3 +77,27 @@ cxxflags = "--no-default-config --gcc-toolchain=/usr -Oz -ffunction-sections -fd
 ldflags = "--no-default-config --gcc-toolchain=/usr -fuse-ld=lld -no-pie -Wl,--gc-sections -Wl,--icf=safe -Wl,--build-id=none -Wl,--as-needed -Wl,--export-dynamic -Wl,-O2"
 external_libs = "system"
 experimental = true
+
+[profiles.macos-static]
+description = "Native macOS Clang build with libpython linked into the interpreter"
+cc = "clang"
+cxx = "clang++"
+configure = ["--disable-shared", "--with-ensurepip=install"]
+cflags = "-Os"
+cppflags = ""
+cxxflags = ""
+ldflags = ""
+external_libs = "environment"
+experimental = false
+
+[profiles.windows-release]
+description = "Native MSVC Release build through CPython PCbuild"
+cc = "cl"
+cxx = "cl"
+configure = []
+cflags = ""
+cppflags = ""
+cxxflags = ""
+ldflags = ""
+external_libs = "environment"
+experimental = false

@@ -25,7 +25,9 @@ filesystem or network.
 **Status:** 0.1.0. `static-lean` on `linux-x86_64` passed the full CPython
 3.14.9 regression suite and the `zerodep` tests with network access. The other
 profiles remain experimental. GitHub Actions is the build, verification, and
-release path.
+release path. Native CI jobs also build `linux-arm64`, `macos-arm64`,
+`macos-x86_64`, and `windows-x86_64`; those artifacts stay outside the release
+selection until their workflows pass.
 
 ## At a glance
 
@@ -36,7 +38,8 @@ release path.
 | Smallest runtime | `runtime-nano`: 16.4 MiB installed, 3.5 MiB archive |
 | Reduction from full CPython | 93.2% installed, 86.4% archive |
 | Agent sandbox image | 31.95 MiB `scratch` image |
-| Current target | `linux-x86_64` |
+| Release target | `linux-x86_64` |
+| Native build targets | `linux-arm64`, `macos-arm64`, `macos-x86_64`, `windows-x86_64` |
 
 ## How SnugPy compares
 
@@ -46,7 +49,7 @@ of the comparison projects on `linux-x86_64`. Sizes are not feature-normalized.
 | Runtime | Approach | Compatibility | Deployment size | Main tradeoff |
 | --- | --- | --- | --- | --- |
 | CPython 3.14.9 (full `test` build) | Reference C implementation, packaged by SnugPy | Full CPython language, standard library, and C-extension ABI | 242.3 MiB installed / 26.0 MiB `tar.xz` (`test`) | Largest footprint |
-| **SnugPy 0.1.0** | **CPython 3.14.9, trimmed and optimized** | **Full CPython language and C-extension ABI; runtime variants remove installer, headers, test, and UI files** | **16.4 MiB installed / 3.5 MiB `tar.xz` (`runtime-nano`); 31.95 MiB `scratch` image** | **Linux-x86_64 only; runtime variants have no pip or headers** |
+| **SnugPy 0.1.0** | **CPython 3.14.9, trimmed and optimized** | **Full CPython language and C-extension ABI; runtime variants remove installer, headers, test, and UI files** | **16.4 MiB installed / 3.5 MiB `tar.xz` (`runtime-nano`); 31.95 MiB `scratch` image** | **Linux-x86_64 release target; native archives build on four additional targets; runtime variants have no pip or headers** |
 | MicroPython 1.29.0 | Independent C implementation | Python 3.4 syntax with select later features; subset standard library | 0.82 MiB stripped Unix binary | Not full CPython; no CPython C-extension ABI |
 | PocketPy 2.2.0 | Independent C11 implementation | Python 3 subset | 0.59 MiB stripped CLI | Game-scripting focus; not full CPython |
 | Monty 1.7.0 | Independent Rust implementation | Partial Python 3.14 subset with a sandbox API | 34.7 MiB installed binary / 16.3 MiB wheel | No ambient filesystem or network; capabilities are supplied by the host |
@@ -88,8 +91,9 @@ reimplementing Python.
   semantics and the C-extension ABI.
 - It is not a security sandbox by itself. `static-lean` is non-PIE; use a
   container or VM as the security boundary.
-- It is not portable beyond `linux-x86_64` yet. macOS, Windows, and
-  `linux-aarch64` are not built.
+- It is not yet released beyond `linux-x86_64`. Native builds for Linux ARM64,
+  macOS ARM64, macOS Intel, and Windows x86_64 are available as CI artifacts,
+  not as approved release artifacts.
 - It is not a package installer in runtime variants. `runtime` and
   `runtime-nano` keep preinstalled packages but remove pip and `ensurepip`.
 
@@ -351,12 +355,35 @@ distribution and lists every variant's installed and archive size separately.
 The direct scripts accept `VERSION`, `TARGET`, and `PROFILE` as positional
 arguments. Use `python -m snugpy_build.cli list` to see the configured values.
 
+Native build cells use the same command shape:
+
+| Target | Runner | Profile | Backend |
+| --- | --- | --- | --- |
+| `linux-x86_64` | `ubuntu-24.04` / Debian 12 container | `static-lean` | `configure` |
+| `linux-arm64` | `ubuntu-24.04-arm` / Debian 12 container | `static-lean` | `configure` |
+| `macos-arm64` | `macos-15` | `macos-static` | `configure` |
+| `macos-x86_64` | `macos-15-intel` | `macos-static` | `configure` |
+| `windows-x86_64` | `windows-2025` | `windows-release` | `pcbuild` |
+
+```bash
+./scripts/build.sh 3.14 static-lean linux-arm64 --jobs "$(nproc)"
+./scripts/build.sh 3.14 macos-static macos-arm64 --jobs "$(sysctl -n hw.logicalcpu)"
+python -m snugpy_build.cli build 3.14 windows-release windows-x86_64
+```
+
+Docker can produce Linux artifacts for both architectures. macOS needs Apple's
+SDK and native code signing tools, and Windows uses MSVC `PCbuild`; neither is a
+supported Docker build target for this project.
+
 ## Portability and limits
 
 - CPython `3.14.9` is the only build target. It is pinned by tag, commit, and
   source SHA256.
-- `linux-x86_64` is the only target. macOS, Windows, and `linux-aarch64` are not
-  built.
+- `linux-x86_64` is the only release-approved target. Native CI builds the
+  other four targets but does not approve them for release.
+- macOS archives currently link Homebrew libraries by absolute path. Treat them
+  as runner-compatible CI artifacts until dependency bundling is added.
+- Windows artifacts are `tar.xz` layouts built with MSVC, not `.exe` installers.
 - `static-lean` is a non-PIE executable. Container or VM isolation must be the
   security boundary.
 - Distribution archives do not bundle external C libraries. Provide the
@@ -416,6 +443,12 @@ archives. A separate `static-lean` job runs inside `debian:bookworm`, links
 Debian system libraries, and runs the ABI gate. A dependent job measures the
 Debian slim, distroless, scratch `runtime`, and scratch `runtime-nano` images.
 An aggregate job downloads all profile results and regenerates the report.
+
+`.github/workflows/native-builds.yml` adds native platform builds. It uses an
+ARM64 Ubuntu runner with a Debian 12 container, Apple Silicon and Intel macOS
+runners, and a Windows runner. The Windows job uses CPython's `PCbuild` and
+`PC/layout` tools; it does not use MinGW or a Linux cross-compiler. Docker on
+`ts-build02` is limited to Linux and is not part of this matrix.
 
 `.github/workflows/benchmark.yml` is the manual full-regression and repeated
 measurement path. It runs the full CPython suite and zerodep tests with network
