@@ -34,7 +34,8 @@ def _print_list(config: Config) -> None:
         print(f"  {key}: {pin.version} ({pin.tag}, {state})")
     print("Targets:")
     for key in sorted(config.targets):
-        print(f"  {key}: {config.targets[key].runner}")
+        target = config.targets[key]
+        print(f"  {key}: {target.runner} ({target.build_backend})")
     print("Profiles:")
     for key in sorted(config.profiles):
         profile = config.profiles[key]

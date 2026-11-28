@@ -1,0 +1,210 @@
+name: native-builds
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SNUGPY_VERSION: "3.14"
+  SNUGPY_COMMIT: ${{ github.sha }}
+
+jobs:
+  linux-arm64:
+    name: Linux ARM64 static-lean
+    runs-on: ubuntu-24.04-arm
+    container: debian:bookworm
+    timeout-minutes: 240
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      SNUGPY_TARGET: linux-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            binutils ca-certificates clang curl file g++ gcc git gzip \
+            libbrotli-dev libbz2-dev libdb-dev libexpat1-dev libffi-dev \
+            libgdbm-compat-dev libgdbm-dev liblzma-dev libncurses-dev \
+            libreadline-dev libsqlite3-dev libssl-dev libzstd-dev lld llvm \
+            make netbase patch patchelf pkg-config python3 python3-venv tar time \
+            tk-dev uuid-dev xz-utils zlib1g-dev
+      - name: Trust cached source trees
+        run: git config --global --add safe.directory '*'
+      - name: Cache verified CPython sources
+        uses: actions/cache@v4
+        with:
+          path: sources/
+          key: snugpy-sources-${{ hashFiles('configs/versions.toml') }}
+      - name: Build, test, package, and measure
+        shell: bash
+        env:
+          PROFILE: static-lean
+        run: |
+          export PYTHONPATH="$PWD"
+          python3 --version
+          ./scripts/fetch.sh "$SNUGPY_VERSION" --zerodep
+          ./scripts/build.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" \
+            --jobs "$(nproc)"
+          ./scripts/test.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --smoke
+          ./scripts/package.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET"
+          ./scripts/measure.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --runs 5
+      - name: Verify external library ABI
+        run: ./scripts/check-abi.sh "out/v3.14.9/${SNUGPY_TARGET}/static-lean"
+      - name: Show failure logs
+        if: failure()
+        shell: bash
+        run: |
+          while IFS= read -r -d '' log_file; do
+            echo "===== ${log_file}"
+            tail -80 "${log_file}"
+          done < <(find results -type f -path '*/logs/*.log' -print0)
+      - name: Upload ARM64 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snugpy-linux-arm64-static-lean
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            dist/*.tar.xz
+            results/**/*.json
+            results/**/logs/*.log
+
+  macos:
+    name: macOS ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-arm64
+            runner: macos-15
+          - target: macos-x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      SNUGPY_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build dependencies
+        run: |
+          brew install pkg-config openssl@3 readline sqlite xz bzip2 zlib libffi expat zstd hyperfine
+          echo "HOMEBREW_PREFIX=$(brew --prefix)" >> "$GITHUB_ENV"
+      - name: Cache verified CPython sources
+        uses: actions/cache@v4
+        with:
+          path: sources/
+          key: snugpy-sources-${{ hashFiles('configs/versions.toml') }}
+      - name: Build, test, package, and measure
+        shell: bash
+        env:
+          PROFILE: macos-static
+        run: |
+          export PYTHONPATH="$PWD"
+          python --version
+          ./scripts/fetch.sh "$SNUGPY_VERSION" --zerodep
+          ./scripts/build.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" \
+            --jobs "$(sysctl -n hw.logicalcpu)"
+          ./scripts/test.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --smoke
+          ./scripts/package.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" \
+            --distribution headless --distribution micro --distribution nano \
+            --distribution runtime --distribution runtime-nano
+          ./scripts/measure.sh "$SNUGPY_VERSION" "$PROFILE" "$SNUGPY_TARGET" --runs 5
+      - name: Show failure logs
+        if: failure()
+        shell: bash
+        run: |
+          while IFS= read -r -d '' log_file; do
+            echo "===== ${log_file}"
+            tail -80 "${log_file}"
+          done < <(find results -type f -path '*/logs/*.log' -print0)
+          while IFS= read -r -d '' config_log; do
+            echo "===== ${config_log}"
+            sed -n '220,420p' "${config_log}"
+          done < <(find work -name config.log -print0 2>/dev/null)
+      - name: Upload macOS artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snugpy-${{ matrix.target }}-macos-static
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            dist/*.tar.xz
+            results/**/*.json
+            results/**/logs/*.log
+            work/**/build/config.log
+
+  windows-x86_64:
+    name: Windows x86_64
+    runs-on: windows-2025
+    timeout-minutes: 300
+    env:
+      SNUGPY_TARGET: windows-x86_64
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache verified CPython sources
+        uses: actions/cache@v4
+        with:
+          path: sources/
+          key: snugpy-sources-${{ hashFiles('configs/versions.toml') }}
+      - name: Build, test, package, and measure
+        run: |
+          $env:PYTHONPATH = "$PWD"
+          $commands = @(
+            @("fetch", "$env:SNUGPY_VERSION", "--zerodep"),
+            @("build", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--jobs", "$env:NUMBER_OF_PROCESSORS"),
+            @("test", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--smoke"),
+            @("package", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--distribution", "headless", "--distribution", "micro", "--distribution", "nano", "--distribution", "runtime", "--distribution", "runtime-nano"),
+            @("measure", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--runs", "5")
+          )
+          python --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($command in $commands) {
+            python -m snugpy_build.cli @command
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Show failure logs
+        if: failure()
+        run: |
+          Get-ChildItem -Path results -Recurse -Filter *.log -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              Write-Output "===== $($_.FullName)"
+              Get-Content -Path $_.FullName -Tail 80
+            }
+          Get-ChildItem -Path work -Recurse -Filter *.log -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              Write-Output "===== $($_.FullName)"
+              Get-Content -Path $_.FullName -Tail 120
+            }
+      - name: Upload Windows artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snugpy-windows-x86_64
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            dist/*.tar.xz
+            results/**/*.json
+            results/**/logs/*.log

@@ -59,6 +59,9 @@ class BuildPaths:
 
     @property
     def build_dir(self) -> Path:
+        if self.spec.target.build_backend == "pcbuild":
+            platform = {"x86_64": "amd64", "arm64": "arm64"}[self.spec.target.arch]
+            return self.work_src / "PCbuild" / platform
         return self.work_root / "build"
 
     @property

@@ -3,8 +3,31 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PREFIX="${1:-${SNUGPY_CONDA_PREFIX:-}}"
-LOCK_FILE="${ROOT_DIR}/conda-linux-64.lock"
 USE_LOCK="${SNUGPY_CONDA_USE_LOCK:-1}"
+ENVIRONMENT_FILE="${ROOT_DIR}/environment.yml"
+LOCK_FILE=""
+
+case "$(uname -s)-$(uname -m)" in
+Linux-x86_64)
+	LOCK_FILE="${ROOT_DIR}/conda-linux-64.lock"
+	;;
+Linux-aarch64 | Linux-arm64)
+	ENVIRONMENT_FILE="${ROOT_DIR}/environment-linux-aarch64.yml"
+	LOCK_FILE="${ROOT_DIR}/conda-linux-aarch64.lock"
+	;;
+Darwin-arm64)
+	ENVIRONMENT_FILE="${ROOT_DIR}/environment-macos.yml"
+	LOCK_FILE="${ROOT_DIR}/conda-osx-arm64.lock"
+	;;
+Darwin-x86_64)
+	ENVIRONMENT_FILE="${ROOT_DIR}/environment-macos.yml"
+	LOCK_FILE="${ROOT_DIR}/conda-osx-64.lock"
+	;;
+MINGW* | MSYS* | CYGWIN*)
+	ENVIRONMENT_FILE="${ROOT_DIR}/environment.yml"
+	LOCK_FILE="${ROOT_DIR}/conda-win-64.lock"
+	;;
+esac
 
 if [[ -z "${PREFIX}" ]]; then
 	if [[ -d "${HOME}/ml_lab" ]]; then
@@ -46,17 +69,17 @@ read_environment_packages() {
         sub(/^[[:space:]]+- /, "")
         print
       }
-    ' "${ROOT_DIR}/environment.yml"
+    ' "${ENVIRONMENT_FILE}"
 	)
 	if [[ "${#packages[@]}" -eq 0 ]]; then
-		echo "no dependencies parsed from ${ROOT_DIR}/environment.yml" >&2
+		echo "no dependencies parsed from ${ENVIRONMENT_FILE}" >&2
 		exit 1
 	fi
 }
 
 create_from_environment_yml() {
 	read_environment_packages
-	echo "creating conda environment at ${PREFIX} from environment.yml"
+	echo "creating conda environment at ${PREFIX} from ${ENVIRONMENT_FILE}"
 	"${CONDA_BIN}" create --yes --prefix "${PREFIX}" \
 		--override-channels -c conda-forge "${packages[@]}"
 }
@@ -66,7 +89,7 @@ if [[ -f "${PREFIX}/conda-meta/history" ]]; then
 	echo "updating conda environment at ${PREFIX}"
 	"${CONDA_BIN}" install --yes --prefix "${PREFIX}" \
 		--override-channels -c conda-forge "${packages[@]}"
-elif [[ "${USE_LOCK}" == "1" && -f "${LOCK_FILE}" ]]; then
+elif [[ "${USE_LOCK}" == "1" && -n "${LOCK_FILE}" && -f "${LOCK_FILE}" ]]; then
 	echo "creating conda environment at ${PREFIX} from ${LOCK_FILE}"
 	if ! "${CONDA_BIN}" create --yes --prefix "${PREFIX}" --file "${LOCK_FILE}" \
 		--override-channels -c conda-forge; then
@@ -78,7 +101,9 @@ else
 	create_from_environment_yml
 fi
 
-"${ROOT_DIR}/scripts/install-gdbm-compat.sh" "${PREFIX}"
+if [[ "$(uname -s)" == "Linux" ]]; then
+	"${ROOT_DIR}/scripts/install-gdbm-compat.sh" "${PREFIX}"
+fi
 "${ROOT_DIR}/scripts/conda-aliases.sh" "${PREFIX}"
 echo "conda environment ready: ${PREFIX}"
 echo "activate with: source \"$("${CONDA_BIN}" info --base)/etc/profile.d/conda.sh\" && conda activate \"${PREFIX}\""

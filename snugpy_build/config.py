@@ -50,6 +50,7 @@ class TargetSpec:
     glibc_baseline: str
     apt_packages: tuple[str, ...]
     notes: str
+    build_backend: str = "configure"
 
 
 @dataclass(frozen=True)
@@ -215,20 +216,36 @@ def _load_targets(path: Path) -> dict[str, TargetSpec]:
         raw = _require_table(raw_value, f"{path}: targets.{name}")
         try:
             apt_packages = raw.get("apt_packages", [])
+            platform = str(raw["platform"])
+            default_backend = "pcbuild" if platform == "windows" else "configure"
             target = TargetSpec(
                 name=name,
-                platform=str(raw["platform"]),
+                platform=platform,
                 arch=str(raw["arch"]),
                 runner=str(raw["runner"]),
-                container_image=str(raw["container_image"]),
+                container_image=str(raw.get("container_image", "")),
                 glibc_baseline=str(raw.get("glibc_baseline", "")),
                 apt_packages=tuple(str(item) for item in apt_packages),
                 notes=str(raw.get("notes", "")),
+                build_backend=str(raw.get("build_backend", default_backend)),
             )
         except (KeyError, TypeError) as error:
             raise ConfigError(f"{path}: invalid target {name!r}: {error}") from error
-        if target.platform != "linux":
-            raise ConfigError(f"{path}: target {name!r} is not Linux")
+        if target.platform not in {"linux", "macos", "windows"}:
+            raise ConfigError(
+                f"{path}: target {name!r} has unsupported platform {target.platform!r}"
+            )
+        if target.arch not in {"x86_64", "arm64", "aarch64"}:
+            raise ConfigError(
+                f"{path}: target {name!r} has unsupported architecture {target.arch!r}"
+            )
+        if target.build_backend not in {"configure", "pcbuild"}:
+            raise ConfigError(
+                f"{path}: target {name!r} has unsupported build backend "
+                f"{target.build_backend!r}"
+            )
+        if target.build_backend == "pcbuild" and target.platform != "windows":
+            raise ConfigError(f"{path}: target {name!r} uses pcbuild outside Windows")
         targets[name] = target
     if not targets:
         raise ConfigError(f"{path}: no targets configured")

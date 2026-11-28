@@ -6,6 +6,7 @@ arch = "x86_64"
 runner = "ubuntu-24.04"
 container_image = "debian:bookworm"
 glibc_baseline = "2.36"
+build_backend = "configure"
 apt_packages = [
   "binutils",
   "build-essential",
@@ -49,3 +50,84 @@ apt_packages = [
   "zlib1g-dev",
 ]
 notes = "Conda profiles build on the Ubuntu runner. The static-lean profile builds in Debian 12 against system libraries and targets glibc 2.36. Verify artifact symbol requirements with objdump -T before any release claim."
+
+[targets."linux-arm64"]
+platform = "linux"
+arch = "arm64"
+runner = "ubuntu-24.04-arm"
+container_image = "debian:bookworm"
+glibc_baseline = "2.36"
+build_backend = "configure"
+apt_packages = [
+  "binutils",
+  "build-essential",
+  "ca-certificates",
+  "clang",
+  "curl",
+  "file",
+  "g++",
+  "gcc",
+  "git",
+  "gzip",
+  "hyperfine",
+  "libbrotli-dev",
+  "libbz2-dev",
+  "libdb-dev",
+  "libexpat1-dev",
+  "libffi-dev",
+  "libgdbm-compat-dev",
+  "libgdbm-dev",
+  "liblzma-dev",
+  "libncurses-dev",
+  "libreadline-dev",
+  "libsqlite3-dev",
+  "libssl-dev",
+  "libzstd-dev",
+  "lld",
+  "llvm",
+  "make",
+  "netbase",
+  "patch",
+  "patchelf",
+  "pkg-config",
+  "python3",
+  "python3-pip",
+  "python3-venv",
+  "tar",
+  "time",
+  "tk-dev",
+  "uuid-dev",
+  "xz-utils",
+  "zlib1g-dev",
+]
+notes = "Native ARM64 build in a Debian 12 container. No QEMU emulation is used. Verify artifact symbol requirements with objdump -T before any release claim."
+
+[targets."macos-arm64"]
+platform = "macos"
+arch = "arm64"
+runner = "macos-15"
+container_image = ""
+glibc_baseline = ""
+build_backend = "configure"
+apt_packages = []
+notes = "Native Apple Silicon build. Homebrew supplies OpenSSL, SQLite, readline, and related libraries. No release approval until the archive is verified on a clean macOS host."
+
+[targets."macos-x86_64"]
+platform = "macos"
+arch = "x86_64"
+runner = "macos-15-intel"
+container_image = ""
+glibc_baseline = ""
+build_backend = "configure"
+apt_packages = []
+notes = "Native Intel macOS build on the macos-15-intel runner. Availability is currently announced through August 2027."
+
+[targets."windows-x86_64"]
+platform = "windows"
+arch = "x86_64"
+runner = "windows-2025"
+container_image = ""
+glibc_baseline = ""
+build_backend = "pcbuild"
+apt_packages = []
+notes = "Native MSVC build through CPython PCbuild and PC/layout. The workflow produces a portable layout archive, not an installer."

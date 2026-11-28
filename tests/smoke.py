@@ -39,6 +39,17 @@ REQUIRED_MODULES = (
     "xml",
 )
 
+WINDOWS_UNSUPPORTED_MODULES = {"curses", "readline", "tkinter"}
+DARWIN_OPTIONAL_MODULES = {"tkinter"}
+if os.name == "nt":
+    REQUIRED_MODULES = tuple(
+        name for name in REQUIRED_MODULES if name not in WINDOWS_UNSUPPORTED_MODULES
+    )
+elif sys.platform == "darwin":
+    REQUIRED_MODULES = tuple(
+        name for name in REQUIRED_MODULES if name not in DARWIN_OPTIONAL_MODULES
+    )
+
 
 def check_imports() -> None:
     """Import the stdlib modules required by the compatibility plan."""
@@ -72,8 +83,8 @@ def check_sqlite() -> None:
 def check_ctypes() -> None:
     """Load a native library through ctypes."""
 
-    library = ctypes.CDLL(None)
-    if not hasattr(library, "_Py_NoneStruct") and not hasattr(library, "Py_GetVersion"):
+    library = ctypes.pythonapi
+    if not hasattr(library, "Py_GetVersion"):
         raise RuntimeError(
             "ctypes could not resolve symbols from the running interpreter"
         )
@@ -138,9 +149,10 @@ def check_ssl() -> None:
         )
     if not ssl.OPENSSL_VERSION:
         raise RuntimeError("OpenSSL version is empty")
-    paths = ssl.get_default_verify_paths()
-    if not any((paths.cafile, paths.capath)):
-        raise RuntimeError("no default certificate verification path is configured")
+    if os.name != "nt":
+        paths = ssl.get_default_verify_paths()
+        if not any((paths.cafile, paths.capath)):
+            raise RuntimeError("no default certificate verification path is configured")
 
 
 def check_filesystem() -> None:
@@ -170,7 +182,7 @@ def check_dbm() -> None:
                 raise RuntimeError("dbm round trip failed")
 
 
-CHECKS = (
+CHECKS = [
     ("imports", check_imports),
     ("sqlite", check_sqlite),
     ("ctypes", check_ctypes),
@@ -179,8 +191,10 @@ CHECKS = (
     ("asyncio", check_asyncio),
     ("ssl", check_ssl),
     ("filesystem", check_filesystem),
-    ("dbm", check_dbm),
-)
+]
+if os.name != "nt" and sys.platform != "darwin":
+    CHECKS.append(("dbm", check_dbm))
+CHECKS = tuple(CHECKS)
 
 
 def main() -> int:

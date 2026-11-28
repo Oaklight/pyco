@@ -20,7 +20,8 @@ SnugPy 将 CPython 变成可部署运行时。它从固定版本的 CPython 3.14
 
 **状态：** 0.1.0。`linux-x86_64` 上的 `static-lean` 已通过完整 CPython 3.14.9
 回归测试，以及允许联网的 `zerodep` 测试。其他 profile 仍为实验性。GitHub Actions
-是构建、验证和发布路径。
+是构建、验证和发布路径。原生 CI 任务还会构建 `linux-arm64`、`macos-arm64`、
+`macos-x86_64` 和 `windows-x86_64`；工作流通过前，这些产物不进入发布选择。
 
 ## 概览
 
@@ -31,7 +32,8 @@ SnugPy 将 CPython 变成可部署运行时。它从固定版本的 CPython 3.14
 | 最小运行时 | `runtime-nano`：安装 16.4 MiB，归档 3.5 MiB |
 | 相对完整 CPython | 安装体积减少 93.2%，归档减少 86.4% |
 | Agent 沙盒镜像 | 31.95 MiB `scratch` 镜像 |
-| 当前目标 | `linux-x86_64` |
+| 发布目标 | `linux-x86_64` |
+| 原生构建目标 | `linux-arm64`、`macos-arm64`、`macos-x86_64`、`windows-x86_64` |
 
 ## 与其他实现对比
 
@@ -41,7 +43,7 @@ SnugPy 将 CPython 变成可部署运行时。它从固定版本的 CPython 3.14
 | 运行时 | 实现方式 | 兼容性 | 部署体积 | 主要取舍 |
 | --- | --- | --- | --- | --- |
 | CPython 3.14.9（完整 `test` 构建） | 参考 C 实现，由 SnugPy 打包 | 完整 CPython 语言、标准库和 C 扩展 ABI | 安装 242.3 MiB / `tar.xz` 26.0 MiB（`test`） | 体积最大 |
-| **SnugPy 0.1.0** | **CPython 3.14.9，裁剪并优化** | **完整 CPython 语言和 C 扩展 ABI；运行时变体删除安装器、头文件、测试和 UI 文件** | **安装 16.4 MiB / `tar.xz` 3.5 MiB（`runtime-nano`）；`scratch` 镜像 31.95 MiB** | **仅 Linux x86_64；运行时变体没有 pip 和头文件** |
+| **SnugPy 0.1.0** | **CPython 3.14.9，裁剪并优化** | **完整 CPython 语言和 C 扩展 ABI；运行时变体删除安装器、头文件、测试和 UI 文件** | **安装 16.4 MiB / `tar.xz` 3.5 MiB（`runtime-nano`）；`scratch` 镜像 31.95 MiB** | **发布目标为 Linux x86_64；另有四个原生构建目标；运行时变体没有 pip 和头文件** |
 | MicroPython 1.29.0 | 独立 C 实现 | Python 3.4 语法及部分后续特性；标准库子集 | 已 strip 的 Unix 二进制 0.82 MiB | 不是完整 CPython；没有 CPython C 扩展 ABI |
 | PocketPy 2.2.0 | 独立 C11 实现 | Python 3 子集 | 已 strip 的 CLI 0.59 MiB | 面向游戏脚本；不是完整 CPython |
 | Monty 1.7.0 | 独立 Rust 实现 | 部分 Python 3.14 子集，带沙箱 API | 安装后的二进制 34.7 MiB / wheel 16.3 MiB | 无默认文件系统和网络；能力由宿主提供 |
@@ -74,7 +76,8 @@ pip、IDLE/Tk、文档、`pydoc_data`，以及 `runtime-nano` 中的 `__pycache_
 
 - 它不是新的 Python 实现。语言语义和 C 扩展 ABI 来自 CPython。
 - 它不是安全沙箱本身。`static-lean` 是非 PIE；安全边界应使用容器或 VM。
-- 它尚未支持 `linux-x86_64` 之外的平台。macOS、Windows 和 `linux-aarch64` 尚未构建。
+- 它尚未在 `linux-x86_64` 之外发布。Linux ARM64、macOS ARM64、macOS Intel 和
+  Windows x86_64 已提供原生 CI 产物，但还不是批准的发布产物。
 - 它不是运行时变体中的包安装器。`runtime` 和 `runtime-nano` 保留预装包，但删除 pip 和
   `ensurepip`。
 
@@ -311,10 +314,32 @@ HTTPS、SQLite、`ctypes`、压缩模块、时区和 `site-packages`。编辑
 直接脚本以位置参数接收 `VERSION`、`TARGET` 和 `PROFILE`。使用
 `python -m snugpy_build.cli list` 查看当前配置值。
 
+原生构建单元使用相同命令形状：
+
+| 目标 | Runner | Profile | 后端 |
+| --- | --- | --- | --- |
+| `linux-x86_64` | `ubuntu-24.04` / Debian 12 容器 | `static-lean` | `configure` |
+| `linux-arm64` | `ubuntu-24.04-arm` / Debian 12 容器 | `static-lean` | `configure` |
+| `macos-arm64` | `macos-15` | `macos-static` | `configure` |
+| `macos-x86_64` | `macos-15-intel` | `macos-static` | `configure` |
+| `windows-x86_64` | `windows-2025` | `windows-release` | `pcbuild` |
+
+```bash
+./scripts/build.sh 3.14 static-lean linux-arm64 --jobs "$(nproc)"
+./scripts/build.sh 3.14 macos-static macos-arm64 --jobs "$(sysctl -n hw.logicalcpu)"
+python -m snugpy_build.cli build 3.14 windows-release windows-x86_64
+```
+
+Docker 可以构建两种 Linux 架构的产物。macOS 需要 Apple SDK 和原生签名工具，
+Windows 使用 MSVC `PCbuild`；两者都不是本项目支持的 Docker 构建目标。
+
 ## 可移植性与限制
 
 - CPython `3.14.9` 是唯一构建目标，由标签、提交和源码 SHA256 固定。
-- `linux-x86_64` 是唯一目标。macOS、Windows 和 `linux-aarch64` 尚未构建。
+- `linux-x86_64` 是唯一发布批准目标。原生 CI 构建另外四个目标，但尚未批准发布。
+- macOS 归档当前按绝对路径链接 Homebrew 库。在加入依赖捆绑前，只应视为与 runner
+  兼容的 CI 产物。
+- Windows 产物是 MSVC 构建的 `tar.xz` 目录，不是 `.exe` 安装器。
 - `static-lean` 是非 PIE 可执行文件。安全边界必须使用容器或 VM。
 - 发行归档不捆绑外部 C 库。运行时需提供文档列出的 soname，或使用镜像。
 - 运行时变体没有 pip、`ensurepip`、头文件或构建工具。
@@ -363,6 +388,11 @@ uninstall.sh    uninstaller for the managed venv
 任务在 `debian:bookworm` 中运行，链接 Debian 系统库并执行 ABI 检查。依赖任务测量 Debian
 slim、distroless、scratch `runtime` 和 scratch `runtime-nano` 镜像。汇总任务下载所有
 profile 结果并重新生成报告。
+
+`.github/workflows/native-builds.yml` 增加原生平台构建。它使用 ARM64 Ubuntu runner
+加 Debian 12 容器、Apple Silicon 和 Intel macOS runner，以及 Windows runner。
+Windows 任务使用 CPython 的 `PCbuild` 和 `PC/layout` 工具，不使用 MinGW 或 Linux
+交叉编译器。`ts-build02` 上的 Docker 仅限 Linux，不属于该矩阵。
 
 `.github/workflows/benchmark.yml` 是手动完整回归和重复测量路径。它运行完整 CPython 测试
 套件和允许联网的 zerodep 测试，然后打包并测量一个选定 profile。

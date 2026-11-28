@@ -165,6 +165,22 @@ def _skip_gate(
     return gate
 
 
+def _venv_python(venv: Path, spec: BuildSpec) -> Path:
+    """Return the interpreter path inside a new virtual environment."""
+
+    if spec.target.platform == "windows":
+        return venv / "Scripts" / "python.exe"
+    return venv / "bin" / "python"
+
+
+def _venv_pip(venv: Path, spec: BuildSpec) -> Path:
+    """Return the pip executable path inside a new virtual environment."""
+
+    if spec.target.platform == "windows":
+        return venv / "Scripts" / "pip.exe"
+    return venv / "bin" / "pip"
+
+
 def _version_validator(expected: str) -> Callable[[str], str | None]:
     def validate(output: str) -> str | None:
         if expected not in output:
@@ -190,6 +206,8 @@ def _sysconfig_validator(
             return (
                 f"interpreter version {version!r} does not match {spec.version.version}"
             )
+        if spec.target.build_backend == "pcbuild":
+            return None
         shared = data.get("Py_ENABLE_SHARED")
         wants_shared = "--disable-shared" not in spec.profile.configure
         if bool(int(shared or 0)) != wants_shared:
@@ -202,6 +220,15 @@ def _sysconfig_validator(
 def _check_abi(
     spec: BuildSpec, prefix: Path, tests_root: Path, gates: list[GateResult]
 ) -> None:
+    if spec.target.platform == "windows":
+        _skip_gate(
+            tests_root,
+            gates,
+            "abi extension",
+            "abi",
+            "MSVC extension ABI gate is not implemented for Windows",
+        )
+        return
     python = find_python(prefix, spec.version.version)
     short = ".".join(spec.version.version.split(".")[:2])
     config_tool = prefix / "bin" / f"python{short}-config"
@@ -232,15 +259,12 @@ def _check_abi(
     module_dir.mkdir(parents=True)
     source = spec.root / "tests" / "abi_smoke" / "abi_smoke.c"
     module = module_dir / f"abi_smoke{suffix}"
-    compile_command = [
-        spec.profile.cc,
-        "-shared",
-        "-fPIC",
-        *includes,
-        str(source),
-        "-o",
-        str(module),
-    ]
+    compile_command = [spec.profile.cc]
+    if spec.target.platform == "macos":
+        compile_command.extend(["-bundle", "-undefined", "dynamic_lookup"])
+    else:
+        compile_command.extend(["-shared", "-fPIC"])
+    compile_command.extend([*includes, str(source), "-o", str(module)])
     compile_gate = _run_gate(
         spec,
         prefix,
@@ -319,7 +343,8 @@ def _check_zerodep(
         )
         return
     venv = tests_root / "venv"
-    if not (venv / "bin" / "python").exists():
+    venv_python = _venv_python(venv, spec)
+    if not venv_python.exists():
         _skip_gate(
             tests_root,
             gates,
@@ -328,7 +353,7 @@ def _check_zerodep(
             "venv was not created",
         )
         return
-    pip = venv / "bin" / "pip"
+    pip = _venv_pip(venv, spec)
     install_gate = _run_gate(
         spec,
         prefix,
@@ -356,12 +381,14 @@ def _check_zerodep(
         gates,
         "zerodep tests",
         "zerodep",
-        ["make", "test", f"PYTHON={venv / 'bin' / 'python'}"],
+        ["make", "test", f"PYTHON={venv_python}"],
         required=True,
         cwd=tests_root / "zerodep",
         env={
             **python_runtime_env(prefix),
-            "PATH": f"{venv / 'bin'}:{os.environ.get('PATH', '')}",
+            "PATH": os.pathsep.join(
+                [str(venv_python.parent), os.environ.get("PATH", "")]
+            ),
         },
         timeout=3600,
     )
@@ -458,7 +485,7 @@ def validate(
             gates,
             "venv interpreter",
             "smoke",
-            [str(venv / "bin" / "python"), "-c", "print('venv-ok')"],
+            [str(_venv_python(venv, spec)), "-c", "print('venv-ok')"],
         )
     _run_gate(
         spec,

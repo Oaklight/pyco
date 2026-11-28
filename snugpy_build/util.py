@@ -269,30 +269,44 @@ def find_python(prefix: Path, version: str) -> Path:
         prefix / "bin" / f"python{short}",
         prefix / "bin" / "python3",
         prefix / "bin" / "python",
+        prefix / f"python{short}.exe",
+        prefix / "python3.exe",
+        prefix / "python.exe",
     ]
     for candidate in candidates:
         if candidate.exists():
             return candidate.resolve()
-    raise SnugPyError(f"no interpreter found under {prefix}/bin")
+    raise SnugPyError(f"no interpreter found under {prefix}/bin or {prefix}")
 
 
 def python_runtime_env(prefix: Path) -> dict[str, str]:
     """Return an environment that prefers the built runtime and its libraries."""
 
     env = os.environ.copy()
+    windows = os.name == "nt"
     lib_dir = str(prefix / "lib")
-    bin_dir = str(prefix / "bin")
-    library_paths = [lib_dir]
+    bin_dir = str(prefix if windows else prefix / "bin")
+    path_entries = [bin_dir]
+    if windows:
+        path_entries.append(str(prefix / "Scripts"))
+    if env.get("PATH"):
+        path_entries.append(env["PATH"])
+    env["PATH"] = os.pathsep.join(path_entries)
+
     conda_prefix = env.get("SNUGPY_CONDA_PREFIX") or env.get("CONDA_PREFIX")
-    if conda_prefix:
-        conda_lib_dir = str(Path(conda_prefix) / "lib")
-        if conda_lib_dir != lib_dir:
-            library_paths.append(conda_lib_dir)
-    existing_library_path = env.get("LD_LIBRARY_PATH", "")
-    if existing_library_path:
-        library_paths.append(existing_library_path)
-    env["LD_LIBRARY_PATH"] = ":".join(library_paths)
-    env["PATH"] = bin_dir + (f":{env['PATH']}" if env.get("PATH") else "")
+    if not windows:
+        library_paths = [lib_dir]
+        if conda_prefix:
+            conda_lib_dir = str(Path(conda_prefix) / "lib")
+            if conda_lib_dir != lib_dir:
+                library_paths.append(conda_lib_dir)
+        existing_library_path = env.get("LD_LIBRARY_PATH", "")
+        if existing_library_path:
+            library_paths.append(existing_library_path)
+        joined_library_paths = ":".join(library_paths)
+        env["LD_LIBRARY_PATH"] = joined_library_paths
+        if sys.platform == "darwin":
+            env["DYLD_LIBRARY_PATH"] = joined_library_paths
     env["PYTHONNOUSERSITE"] = "1"
     if "SSL_CERT_FILE" not in env:
         for certificate in (
