@@ -11,6 +11,8 @@ NAMESPACE ?= oaklight
 
 export PYTHONPATH := $(CURDIR)$(if $(PYTHONPATH),:$(PYTHONPATH))
 
+SHELL_SCRIPTS := scripts/*.sh install.sh uninstall.sh
+
 .PHONY: all help conda lock check fetch build test test-full measure package report matrix clean images publish-images
 
 all: check
@@ -50,9 +52,9 @@ check:
 	$(PYTHON) -m unittest discover -s tests -v
 	$(PYTHON) -m compileall -q snugpy_build tests benchmarks
 	command -v shellcheck >/dev/null
-	shellcheck scripts/*.sh
+	shellcheck $(SHELL_SCRIPTS)
 	command -v shfmt >/dev/null
-	shfmt -d scripts/*.sh
+	shfmt -d $(SHELL_SCRIPTS)
 
 fetch:
 	./scripts/fetch.sh "$(VERSION)" --zerodep
