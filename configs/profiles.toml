@@ -71,10 +71,10 @@ description = "Static libpython with Clang -Oz, Debian system external libs, non
 cc = "clang"
 cxx = "clang++"
 configure = ["--disable-shared", "--with-ensurepip=install", "--without-doc-strings"]
-cflags = "--no-default-config --gcc-toolchain=/usr -Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fno-semantic-interposition"
+cflags = "--gcc-toolchain=/usr -Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fno-semantic-interposition"
 cppflags = ""
-cxxflags = "--no-default-config --gcc-toolchain=/usr -Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fvisibility-inlines-hidden -fno-semantic-interposition"
-ldflags = "--no-default-config --gcc-toolchain=/usr -fuse-ld=lld -no-pie -Wl,--gc-sections -Wl,--icf=safe -Wl,--build-id=none -Wl,--as-needed -Wl,--export-dynamic -Wl,-O2"
+cxxflags = "--gcc-toolchain=/usr -Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fvisibility-inlines-hidden -fno-semantic-interposition"
+ldflags = "--gcc-toolchain=/usr -fuse-ld=lld -no-pie -Wl,--gc-sections -Wl,--icf=safe -Wl,--build-id=none -Wl,--as-needed -Wl,--export-dynamic -Wl,-O2"
 external_libs = "system"
 experimental = true
 

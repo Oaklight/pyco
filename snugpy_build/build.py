@@ -358,6 +358,24 @@ def _save_metadata(
     return metadata
 
 
+def _install_environment(spec: BuildSpec, paths: BuildPaths) -> dict[str, str]:
+    """Return the environment used to install one build."""
+
+    environment = python_runtime_env(paths.prefix)
+    if spec.target.build_backend == "pcbuild":
+        environment["PYTHONINCLUDE"] = str(paths.work_src / "Include")
+    for name in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
+        if name not in environment and not (
+            name == "DYLD_LIBRARY_PATH" and sys.platform == "darwin"
+        ):
+            continue
+        existing_library_path = environment.get(name, "")
+        environment[name] = str(paths.build_dir) + (
+            f":{existing_library_path}" if existing_library_path else ""
+        )
+    return environment
+
+
 def build(
     spec: BuildSpec, jobs: int | None = None, clean: bool = True, dry_run: bool = False
 ) -> BuildResult:
@@ -488,16 +506,7 @@ def build(
             raise BuildError(f"build failed; see {built.log_path}")
 
         log(f"installing into {paths.prefix}")
-        install_env = python_runtime_env(paths.prefix)
-        for name in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
-            if name not in install_env and not (
-                name == "DYLD_LIBRARY_PATH" and sys.platform == "darwin"
-            ):
-                continue
-            existing_library_path = install_env.get(name, "")
-            install_env[name] = str(paths.build_dir) + (
-                f":{existing_library_path}" if existing_library_path else ""
-            )
+        install_env = _install_environment(spec, paths)
         installed_result = run_command(
             install_cmd,
             cwd=paths.build_dir if configure_cmd is not None else paths.work_src,

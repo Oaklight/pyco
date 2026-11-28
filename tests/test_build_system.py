@@ -12,11 +12,16 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from snugpy_build.build import _flag_tokens_applied, _flags_in_makefile  # noqa: E402
+from snugpy_build.build import (  # noqa: E402
+    _flag_tokens_applied,
+    _flags_in_makefile,
+    _install_environment,
+)
 from snugpy_build.config import ConfigError, load_config  # noqa: E402
 from snugpy_build.distributions import (  # noqa: E402
     DistributionError,
@@ -102,6 +107,13 @@ class ConfigTests(unittest.TestCase):
         windows = self.config.resolve("3.14", "windows-release", "windows-x86_64")
         self.assertEqual(macos.target.platform, "macos")
         self.assertEqual(windows.target.build_backend, "pcbuild")
+
+    def test_pcbuild_install_env_points_layout_at_target_headers(self) -> None:
+        spec = self.config.resolve("3.14", "windows-release", "windows-x86_64")
+        paths = BuildPaths(spec)
+        with patch.dict(os.environ, {}, clear=True):
+            env = _install_environment(spec, paths)
+        self.assertEqual(env["PYTHONINCLUDE"], str(paths.work_src / "Include"))
 
     def test_static_and_lto_profiles(self) -> None:
         static = self.config.profiles["static"]
@@ -385,7 +397,7 @@ class ProfileEnvironmentTests(unittest.TestCase):
             "-fno-asynchronous-unwind-tables -fno-ident"
         )
         static_lean_cflags = (
-            "--no-default-config --gcc-toolchain=/usr -Oz "
+            "--gcc-toolchain=/usr -Oz "
             "-ffunction-sections -fdata-sections "
             "-fno-asynchronous-unwind-tables -fno-unwind-tables "
             "-fno-ident -fvisibility=hidden -fno-semantic-interposition"

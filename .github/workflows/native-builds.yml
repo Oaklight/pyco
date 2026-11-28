@@ -171,14 +171,19 @@ jobs:
       - name: Build, test, package, and measure
         run: |
           $env:PYTHONPATH = "$PWD"
+          $commands = @(
+            @("fetch", "$env:SNUGPY_VERSION", "--zerodep"),
+            @("build", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--jobs", "$env:NUMBER_OF_PROCESSORS"),
+            @("test", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--smoke"),
+            @("package", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--distribution", "headless", "--distribution", "micro", "--distribution", "nano", "--distribution", "runtime", "--distribution", "runtime-nano"),
+            @("measure", "$env:SNUGPY_VERSION", "windows-release", "$env:SNUGPY_TARGET", "--runs", "5")
+          )
           python --version
-          python -m snugpy_build.cli fetch "$env:SNUGPY_VERSION" --zerodep
-          python -m snugpy_build.cli build "$env:SNUGPY_VERSION" windows-release "$env:SNUGPY_TARGET" --jobs "$env:NUMBER_OF_PROCESSORS"
-          python -m snugpy_build.cli test "$env:SNUGPY_VERSION" windows-release "$env:SNUGPY_TARGET" --smoke
-          python -m snugpy_build.cli package "$env:SNUGPY_VERSION" windows-release "$env:SNUGPY_TARGET" `
-            --distribution headless --distribution micro --distribution nano `
-            --distribution runtime --distribution runtime-nano
-          python -m snugpy_build.cli measure "$env:SNUGPY_VERSION" windows-release "$env:SNUGPY_TARGET" --runs 5
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($command in $commands) {
+            python -m snugpy_build.cli @command
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - name: Show failure logs
         if: failure()
         run: |
