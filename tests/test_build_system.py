@@ -37,6 +37,7 @@ from snugpy_build.package import (  # noqa: E402
     _elf_type,
     _install_license_files,
     _is_macho,
+    _select_strip,
     _strip_tree,
 )
 from snugpy_build.paths import BuildPaths  # noqa: E402
@@ -542,6 +543,20 @@ class PackageTests(unittest.TestCase):
             result = _strip_tree(Path(directory), "windows")
             self.assertEqual(result["format"], "pe")
             self.assertIn("skipped", result)
+
+    def test_linux_clang_uses_llvm_strip(self) -> None:
+        with patch("snugpy_build.package.shutil.which") as which:
+            which.side_effect = lambda name: f"/usr/bin/{name}"
+            self.assertEqual(_select_strip("linux", "clang"), "/usr/bin/llvm-strip")
+            self.assertEqual(_select_strip("linux", "gcc"), "/usr/bin/strip")
+            self.assertEqual(_select_strip("macos", "clang"), "/usr/bin/strip")
+
+    def test_llvm_strip_falls_back_to_gnu_strip(self) -> None:
+        with patch("snugpy_build.package.shutil.which") as which:
+            which.side_effect = lambda name: (
+                "/usr/bin/strip" if name == "strip" else None
+            )
+            self.assertEqual(_select_strip("linux", "clang"), "/usr/bin/strip")
 
     def test_xz_archive_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

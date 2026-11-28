@@ -98,7 +98,22 @@ def _tree_bytes(root: Path, exclude: Callable[[str], bool] | None = None) -> int
     return total
 
 
-def _strip_tree(root: Path, platform: str) -> dict[str, Any]:
+def _select_strip(platform: str, compiler: str | None) -> str:
+    """Select the strip tool that matches the producing toolchain."""
+
+    if platform == "linux" and compiler and "clang" in Path(compiler).name:
+        llvm_strip = shutil.which("llvm-strip")
+        if llvm_strip is not None:
+            return llvm_strip
+    strip = shutil.which("strip")
+    if strip is None:
+        raise PackageError("strip was not found on PATH")
+    return strip
+
+
+def _strip_tree(
+    root: Path, platform: str, compiler: str | None = None
+) -> dict[str, Any]:
     """Strip ELF or Mach-O files in a staged install tree."""
 
     if platform == "windows":
@@ -112,9 +127,7 @@ def _strip_tree(root: Path, platform: str) -> dict[str, Any]:
             "bytes_saved": 0,
             "skipped": "PE stripping is not enabled",
         }
-    strip = shutil.which("strip")
-    if strip is None:
-        raise PackageError("strip was not found on PATH")
+    strip = _select_strip(platform, compiler)
     before = 0
     after = 0
     binaries = 0
@@ -147,6 +160,7 @@ def _strip_tree(root: Path, platform: str) -> dict[str, Any]:
         raise PackageError("no ELF or Mach-O files found to strip")
     return {
         "format": "macho" if platform == "macos" else "elf",
+        "tool": Path(strip).name,
         "files": count,
         "binaries": binaries,
         "objects_and_archives": objects,
@@ -287,10 +301,12 @@ def _smoke_extracted(
             [str(python), "-c", code],
             env=python_runtime_env(runtime_root),
             check=False,
+            timeout=120,
         )
         if result.returncode != 0:
             raise PackageError(
-                f"extracted package smoke test failed: {result.output.strip()}"
+                f"extracted package smoke test failed with exit code "
+                f"{result.returncode}: {result.output.strip()}"
             )
         return {
             "runtime_root": str(runtime_root),
@@ -359,7 +375,7 @@ def package(spec: BuildSpec, *, only: Sequence[str] | None = None) -> dict[str, 
         )
         license_files = _install_license_files(staging, paths.root, paths.source)
         log(f"installed {len(license_files)} license files")
-        strip = _strip_tree(staging, spec.target.platform)
+        strip = _strip_tree(staging, spec.target.platform, spec.profile.cc)
         if strip.get("skipped"):
             log(f"skipped stripping: {strip['skipped']}")
         else:
