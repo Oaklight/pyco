@@ -10,38 +10,88 @@ English | [中文](README_zh.md)
 
 **Whole Python. Small footprint.**
 
-SnugPy builds compact, deployable Python runtimes and measures each candidate
-against a full CPython baseline. It starts from pinned upstream CPython rather
-than reimplementing the language, so compatibility comes first. Every profile
-build preserves the standard library, `ensurepip`, `venv`, `idlelib`, `tkinter`,
-`test`, and optional native extensions. Packaging then derives seven deployable
-variants from the same stripped tree: `headless`, `headed`, `test`, `micro`,
-`nano`, `runtime`, and `runtime-nano`. The `micro`, `nano`, `runtime`, and
-`runtime-nano` variants drop the installer, headers, docs, and development files
-for runtime-only sandboxes.
+SnugPy turns CPython into a deployable runtime. It starts from pinned CPython
+3.14.9, keeps the language, core standard library, and CPython C-extension ABI,
+then removes deployment-only files and builds a smaller interpreter. The
+smallest runtime variant, `runtime-nano`, is 16.4 MiB installed and 3.5 MiB
+compressed. The full CPython `test` build from the same `static-lean` pipeline is
+242.3 MiB installed and 26.0 MiB compressed.
+
+Use SnugPy when an agent sandbox or Linux service needs full CPython
+compatibility. Use MicroPython or PocketPy when a small Python subset is enough.
+Use Monty when the goal is a strict, low-latency sandbox with no ambient
+filesystem or network.
 
 **Status:** 0.1.0. `static-lean` on `linux-x86_64` passed the full CPython
 3.14.9 regression suite and the `zerodep` tests with network access. The other
 profiles remain experimental. GitHub Actions is the build, verification, and
 release path.
 
-## Origin
+## At a glance
 
-SnugPy started from the same observation as MicroPython and PocketPy: most
-deployments do not need the full CPython source tree or every development
-artifact. Unlike those projects, SnugPy starts from CPython to keep full
-compatibility, then removes deployment-irrelevant parts. Future work may modify
-the interpreter more aggressively; the name does not promise an unmodified
-CPython.
+| Property | SnugPy 0.1.0 |
+| --- | --- |
+| Implementation | CPython 3.14.9 |
+| Compatibility | Full CPython language and C-extension ABI |
+| Smallest runtime | `runtime-nano`: 16.4 MiB installed, 3.5 MiB archive |
+| Reduction from full CPython | 93.2% installed, 86.4% archive |
+| Agent sandbox image | 31.95 MiB `scratch` image |
+| Current target | `linux-x86_64` |
 
-## Version policy
+## How SnugPy compares
 
-The compatibility floor for the SnugPy tooling and for `zerodep` is Python 3.10.
-That does **not** mean SnugPy must build or distribute CPython 3.10, 3.11, 3.12,
-and 3.13. CPython has a different ABI in each minor release. The initial target
-is one pinned CPython 3.14 maintenance release. A future version is added as its
-own pinned source, build matrix, and release decision; compiled objects,
-prefixes, and configuration are never shared between versions.
+The comparison below uses the measured artifacts in this repository and builds
+of the comparison projects on `linux-x86_64`. Sizes are not feature-normalized.
+
+| Runtime | Approach | Compatibility | Deployment size | Main tradeoff |
+| --- | --- | --- | --- | --- |
+| CPython 3.14.9 (full `test` build) | Reference C implementation, packaged by SnugPy | Full CPython language, standard library, and C-extension ABI | 242.3 MiB installed / 26.0 MiB `tar.xz` (`test`) | Largest footprint |
+| **SnugPy 0.1.0** | **CPython 3.14.9, trimmed and optimized** | **Full CPython language and C-extension ABI; runtime variants remove installer, headers, test, and UI files** | **16.4 MiB installed / 3.5 MiB `tar.xz` (`runtime-nano`); 31.95 MiB `scratch` image** | **Linux-x86_64 only; runtime variants have no pip or headers** |
+| MicroPython 1.29.0 | Independent C implementation | Python 3.4 syntax with select later features; subset standard library | 0.82 MiB stripped Unix binary | Not full CPython; no CPython C-extension ABI |
+| PocketPy 2.2.0 | Independent C11 implementation | Python 3 subset | 0.59 MiB stripped CLI | Game-scripting focus; not full CPython |
+| Monty 1.7.0 | Independent Rust implementation | Partial Python 3.14 subset with a sandbox API | 34.7 MiB installed binary / 16.3 MiB wheel | No ambient filesystem or network; capabilities are supplied by the host |
+
+Measurement basis: SnugPy and CPython numbers come from
+`docs/version-matrix.md`; MicroPython 1.29.0 and PocketPy 2.2.0 were built from
+tagged source on 2026-11-28; Monty 1.7.0 is the manylinux x86-64 runtime wheel
+from PyPI. MicroPython and PocketPy are single stripped executables, while the
+CPython and SnugPy figures are installed trees and compressed archives.
+
+The compressed SnugPy archive is still 4.3 times the MicroPython binary and 6.0
+times the PocketPy binary. That gap is the cost of shipping full CPython.
+SnugPy's installed tree is 47% of the Monty 1.7.0 installed binary size, but
+Monty provides VM-level resource limits and a sandbox that exposes only
+host-provided capabilities.
+
+## Why not use a smaller interpreter?
+
+MicroPython and PocketPy achieve their size by implementing a Python subset with
+their own standard-library and native-module APIs. Monty does the same for a
+sandbox with host-provided capabilities. Those are the right choices when the
+deployment does not need full CPython.
+
+SnugPy keeps the CPython implementation. The runtime variants keep the core
+standard library modules used by services and agents, including `ssl`,
+`sqlite3`, `ctypes`, `json`, and `asyncio`. The `runtime` variants also keep
+`site-packages`, so numpy, pandas, and other packages installed at image-build
+time survive. Native extensions need a build for CPython 3.14 and the matching
+external libraries at runtime.
+
+The size reduction comes from removing files that deployment does not need:
+tests, headers, `config-*`, static archives, `ensurepip`, pip, IDLE/Tk, docs,
+`pydoc_data`, and in `runtime-nano`, `__pycache__`. It does not come from
+reimplementing Python.
+
+## What SnugPy is not
+
+- It is not a new Python implementation. CPython remains the source of language
+  semantics and the C-extension ABI.
+- It is not a security sandbox by itself. `static-lean` is non-PIE; use a
+  container or VM as the security boundary.
+- It is not portable beyond `linux-x86_64` yet. macOS, Windows, and
+  `linux-aarch64` are not built.
+- It is not a package installer in runtime variants. `runtime` and
+  `runtime-nano` keep preinstalled packages but remove pip and `ensurepip`.
 
 ## Install
 
@@ -148,7 +198,7 @@ docker run --rm --entrypoint python3.14 oaklight/snugpy:0.1.0-debian \
 The release workflow builds, smoke-tests, and pushes these tags. It does not
 publish multi-architecture manifests.
 
-## Quick start
+## Build from source
 
 The toolchain is a conda-forge environment. It contains Python 3.12, GCC 16,
 Clang 23, `lld`, binutils, `patchelf`, `hyperfine`, GNU `time`, ShellCheck,
@@ -182,7 +232,7 @@ ELF binaries, relocatable objects, and static archives in the staging tree, and
 writes deterministic `tar.xz` archives for every configured distribution. The
 original `out/` prefix keeps its symbols for debugging. Run packaging before
 measurement so the report can record archive and stripped installation sizes.
-Use `--distribution headless` to build one variant while iterating; repeated
+Use `--distribution runtime-nano` to build one variant while iterating; repeated
 flags select several.
 
 To use the environment without activating it, which is how CI runs builds:
@@ -242,7 +292,7 @@ stay consistent.
 | --- | --- | --- | --- |
 | `headless` (default) | tests, test-only extensions, IDLE, Tk, `config-*/libpython*.a`, `config-*/python.o` | `ssl`, `sqlite3`, `ctypes` | Servers and general containers |
 | `headed` | tests, test-only extensions, development archives and objects | `ssl`, `sqlite3`, `ctypes`, `tkinter` | Workstations that need Tk/IDLE |
-| `test` | nothing | `ssl`, `sqlite3`, `ctypes`, `test` | Compatibility testing and redistribution analysis |
+| `test` | nothing | `ssl`, `sqlite3`, `ctypes`, `test` | Full CPython comparison and compatibility testing |
 | `micro` | installer, docs, tests, headers, development files, Tk, curses, dbm, readline | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Stdlib-only agent sandboxes |
 | `nano` | `micro` plus `__pycache__` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Smallest stdlib-only image; imports compile from source |
 | `runtime` | `micro` minus installer, keeps `site-packages` | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` | Agent sandboxes with preinstalled packages |
@@ -274,8 +324,8 @@ modules, time zones, and `site-packages`. Edit `configs/distributions.toml` to
 change the variants; the default distribution is `headless`.
 
 Variant names are appended to archive filenames, for example
-`snugpy-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`. The package
-metadata keeps one entry per variant. The report matrix uses the default
+`snugpy-0.1.0-cpython3.14.9-linux-x86_64-static-lean-runtime-nano.tar.xz`. The
+package metadata keeps one entry per variant. The report matrix uses the default
 distribution and lists every variant's installed and archive size separately.
 
 ## Commands
@@ -291,7 +341,7 @@ distribution and lists every variant's installed and archive size separately.
 | `make test-full PROFILE=size` | Run full CPython and zerodep gates |
 | `make measure PROFILE=size RUNS=20` | Collect size, startup, RSS, and workload data |
 | `make package PROFILE=size` | Create stripped archives for every distribution and smoke-test them |
-| `make package PROFILE=size DISTRIBUTION=headless` | Create and test one distribution |
+| `make package PROFILE=size DISTRIBUTION=runtime-nano` | Create and test one distribution |
 | `make report` | Write `results/summary.csv` and `results/report.md` |
 | `make matrix` | Run all seven profiles without stopping on unrelated failures |
 | `make images PROFILE=static-lean IMAGE_TAG=0.1.0` | Build the four runtime images locally |
@@ -301,25 +351,23 @@ distribution and lists every variant's installed and archive size separately.
 The direct scripts accept `VERSION`, `TARGET`, and `PROFILE` as positional
 arguments. Use `python -m snugpy_build.cli list` to see the configured values.
 
-## Pins
+## Portability and limits
 
-- CPython `3.14.9`, tag `v3.14.9`, commit
-  `ead82c07db1f111d613926ed1b6667411d768125`, SHA256
-  `e02d9ac21cebda6e46435369744a92c65cc7cd8669697694122cf97ffacd1e53`
-- zerodep `v2026.11.20`, commit
-  `9f872e8d652272c34600b9fda6448fe4fd4436c3`
-- Target `linux-x86_64`
-- conda-forge sysroot glibc `2.34` for the conda-linked profiles
-- Debian 12 system libraries for `static-lean`; measured `GLIBC_2.35`,
-  allowed `GLIBC_2.36`, OpenSSL `3.0`
-- Toolchain: Python `3.12`, GCC `16`, Clang `23`, `lld`, GNU binutils
+- CPython `3.14.9` is the only build target. It is pinned by tag, commit, and
+  source SHA256.
+- `linux-x86_64` is the only target. macOS, Windows, and `linux-aarch64` are not
+  built.
+- `static-lean` is a non-PIE executable. Container or VM isolation must be the
+  security boundary.
+- Distribution archives do not bundle external C libraries. Provide the
+  documented sonames at runtime, or use one of the images.
+- Runtime variants have no pip, `ensurepip`, headers, or build tools.
+- `runtime-nano` compiles standard-library modules on first import. Use
+  `runtime` when startup latency matters more than image size.
 
-The conda sysroot is 2.34 even though the CI runner is Ubuntu 24.04.
-`static-lean` does not use that sysroot; it builds in `debian:bookworm` and
-links Debian system libraries. The actual symbol requirements of each artifact
-must be checked with `scripts/check-abi.sh` or `objdump -T` before any
-portability or release claim. These archives are not general-purpose Linux
-distributions.
+The conda-forge `gdbm` package omits its ndbm compatibility library. The conda
+setup step builds `libgdbm_compat` from pinned GDBM `1.18` source so both
+`_dbm` and `_gdbm` are available. `tests/smoke.py` verifies an ndbm round trip.
 
 Native extensions in the conda-linked profiles link conda-forge libraries such
 as OpenSSL, SQLite, and `libffi`. `static-lean` extensions link the Debian
@@ -327,9 +375,18 @@ sonames instead. In both cases the archive does not bundle those libraries. Run
 an extracted artifact with the matching library set available, or bundle the
 required libraries before redistribution.
 
-The conda-forge `gdbm` package omits its ndbm compatibility library. The conda
-setup step builds `libgdbm_compat` from pinned GDBM `1.18` source so both
-`_dbm` and `_gdbm` are available. `tests/smoke.py` verifies an ndbm round trip.
+The actual symbol requirements of each artifact must be checked with
+`scripts/check-abi.sh` or `objdump -T` before any portability or release claim.
+These archives are not general-purpose Linux distributions.
+
+## Version policy
+
+The compatibility floor for the SnugPy tooling and for `zerodep` is Python 3.10.
+That does **not** mean SnugPy must build or distribute CPython 3.10, 3.11, 3.12,
+and 3.13. CPython has a different ABI in each minor release. The initial target
+is one pinned CPython 3.14 maintenance release. A future version is added as its
+own pinned source, build matrix, and release decision; compiled objects,
+prefixes, and configuration are never shared between versions.
 
 ## Layout
 
