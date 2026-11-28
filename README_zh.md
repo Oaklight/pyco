@@ -10,30 +10,73 @@
 
 **完整 Python，更小体积。**
 
-SnugPy 构建紧凑、可部署的 Python 运行时，并将每个候选构建与完整 CPython
-基线对比测量。它从固定版本的上游 CPython 出发，不重新实现语言，因此兼容性优先。每种
-profile 构建都保留标准库、`ensurepip`、`venv`、`idlelib`、`tkinter`、`test`
-和可选原生扩展。打包阶段从同一棵裁剪后的目录树生成七个可部署变体：`headless`、
-`headed`、`test`、`micro`、`nano`、`runtime` 和 `runtime-nano`。`micro`、
-`nano`、`runtime` 和 `runtime-nano` 删除安装器、头文件、文档和开发文件，面向仅运行时
-沙盒。
+SnugPy 将 CPython 变成可部署运行时。它从固定版本的 CPython 3.14.9 出发，保留语言、
+核心标准库和 CPython C 扩展 ABI，再删除仅部署时不需要的文件并缩小解释器。最小的运行时
+变体 `runtime-nano` 安装后为 16.4 MiB，压缩后为 3.5 MiB。同一 `static-lean` 流水线生成的
+全量 CPython `test` 构建安装后为 242.3 MiB，压缩后为 26.0 MiB。
+
+需要完整 CPython 兼容性的 agent 沙盒或 Linux 服务使用 SnugPy。只需小型 Python 子集时
+使用 MicroPython 或 PocketPy。需要无默认文件系统和网络、低延迟的严格沙箱时使用 Monty。
 
 **状态：** 0.1.0。`linux-x86_64` 上的 `static-lean` 已通过完整 CPython 3.14.9
 回归测试，以及允许联网的 `zerodep` 测试。其他 profile 仍为实验性。GitHub Actions
 是构建、验证和发布路径。
 
-## 起源
+## 概览
 
-SnugPy 与 MicroPython、PocketPy 来自同一个观察：多数部署不需要完整 CPython 源码树或
-全部开发产物。与这些项目不同，SnugPy 从 CPython 出发以保留完整兼容性，再删除与部署无关
-的部分。后续工作可能更激进地修改解释器；项目名称并不承诺 CPython 保持未修改。
+| 属性 | SnugPy 0.1.0 |
+| --- | --- |
+| 实现 | CPython 3.14.9 |
+| 兼容性 | 完整 CPython 语言与 C 扩展 ABI |
+| 最小运行时 | `runtime-nano`：安装 16.4 MiB，归档 3.5 MiB |
+| 相对完整 CPython | 安装体积减少 93.2%，归档减少 86.4% |
+| Agent 沙盒镜像 | 31.95 MiB `scratch` 镜像 |
+| 当前目标 | `linux-x86_64` |
 
-## 版本策略
+## 与其他实现对比
 
-SnugPy 工具链和 `zerodep` 的兼容下限是 Python 3.10。这**不**表示 SnugPy 必须构建或
-分发 CPython 3.10、3.11、3.12 和 3.13。CPython 每个次版本都有不同的 ABI。初始目标
-是一个固定的 CPython 3.14 维护版本。未来增加版本时，会为其单独固定源码、构建矩阵和发布
-决策；编译产物、安装前缀和配置不会跨版本共享。
+下表使用本仓库的测量产物，以及 2026-11-28 在 `linux-x86_64` 上构建的对比项目。
+体积没有按功能集归一化。
+
+| 运行时 | 实现方式 | 兼容性 | 部署体积 | 主要取舍 |
+| --- | --- | --- | --- | --- |
+| CPython 3.14.9（完整 `test` 构建） | 参考 C 实现，由 SnugPy 打包 | 完整 CPython 语言、标准库和 C 扩展 ABI | 安装 242.3 MiB / `tar.xz` 26.0 MiB（`test`） | 体积最大 |
+| **SnugPy 0.1.0** | **CPython 3.14.9，裁剪并优化** | **完整 CPython 语言和 C 扩展 ABI；运行时变体删除安装器、头文件、测试和 UI 文件** | **安装 16.4 MiB / `tar.xz` 3.5 MiB（`runtime-nano`）；`scratch` 镜像 31.95 MiB** | **仅 Linux x86_64；运行时变体没有 pip 和头文件** |
+| MicroPython 1.29.0 | 独立 C 实现 | Python 3.4 语法及部分后续特性；标准库子集 | 已 strip 的 Unix 二进制 0.82 MiB | 不是完整 CPython；没有 CPython C 扩展 ABI |
+| PocketPy 2.2.0 | 独立 C11 实现 | Python 3 子集 | 已 strip 的 CLI 0.59 MiB | 面向游戏脚本；不是完整 CPython |
+| Monty 1.7.0 | 独立 Rust 实现 | 部分 Python 3.14 子集，带沙箱 API | 安装后的二进制 34.7 MiB / wheel 16.3 MiB | 无默认文件系统和网络；能力由宿主提供 |
+
+测量口径：SnugPy 与 CPython 数据来自 `docs/version-matrix.md`；MicroPython 1.29.0 和
+PocketPy 2.2.0 从标签源码构建；Monty 1.7.0 使用 PyPI 的 manylinux x86-64 runtime
+wheel。MicroPython 和 PocketPy 是单个已 strip 的可执行文件，CPython 与 SnugPy 是安装
+目录和压缩归档。
+
+SnugPy 压缩归档仍是 MicroPython 二进制的 4.3 倍、PocketPy 二进制的 6.0 倍。这个差距
+来自完整 CPython。SnugPy 的安装体积约为 Monty 1.7.0 安装二进制的 47%，但 Monty 在 VM
+层执行资源限制，并且只暴露宿主提供的能力。
+
+## 为什么不直接使用更小的解释器？
+
+MicroPython 和 PocketPy 通过实现 Python 子集，并定义自己的标准库和原生模块 API 来获得
+小体积。Monty 为沙箱实现了 Python 子集，能力由宿主提供。部署不需要完整 CPython 时，
+这些选择更合适。
+
+SnugPy 保留 CPython 实现。运行时变体保留服务和 agent 使用的核心标准库模块，包括
+`ssl`、`sqlite3`、`ctypes`、`json` 和 `asyncio`。`runtime` 系列还保留
+`site-packages`，因此镜像构建时安装的 numpy、pandas 等包会保留。原生扩展需要针对
+CPython 3.14 构建，并在运行时提供匹配的外部库。
+
+体积缩减来自删除部署不需要的文件：测试、头文件、`config-*`、静态归档、`ensurepip`、
+pip、IDLE/Tk、文档、`pydoc_data`，以及 `runtime-nano` 中的 `__pycache__`。它不是通过
+重新实现 Python 得到的。
+
+## SnugPy 不做什么
+
+- 它不是新的 Python 实现。语言语义和 C 扩展 ABI 来自 CPython。
+- 它不是安全沙箱本身。`static-lean` 是非 PIE；安全边界应使用容器或 VM。
+- 它尚未支持 `linux-x86_64` 之外的平台。macOS、Windows 和 `linux-aarch64` 尚未构建。
+- 它不是运行时变体中的包安装器。`runtime` 和 `runtime-nano` 保留预装包，但删除 pip 和
+  `ensurepip`。
 
 ## 安装
 
@@ -131,7 +174,7 @@ docker run --rm --entrypoint python3.14 oaklight/snugpy:0.1.0-debian \
 
 发布工作流会构建、冒烟测试并推送这些标签。它不发布多架构 manifest。
 
-## 快速开始
+## 从源码构建
 
 工具链使用 conda-forge 环境，包含 Python 3.12、GCC 16、Clang 23、`lld`、binutils、
 `patchelf`、`hyperfine`、GNU `time`、ShellCheck、`go-shfmt`，以及 CPython 可选扩展
@@ -163,7 +206,7 @@ conda activate "$HOME/ml_lab/envs/snugpy"
 `scripts/package.sh` 复制一次安装前缀，删除暂存树中 ELF 二进制、可重定位对象和静态归档的
 调试符号，然后为每个已配置发行变体写入确定性的 `tar.xz` 归档。原始 `out/` 前缀保留符号
 以便调试。请在测量前打包，这样报告能记录归档大小和裁剪后的安装大小。迭代时用
-`--distribution headless` 只构建一个变体；重复该参数可选择多个变体。
+`--distribution runtime-nano` 只构建一个变体；重复该参数可选择多个变体。
 
 不激活环境而直接使用它，CI 构建采用这种方式：
 
@@ -214,7 +257,7 @@ profile 结果和所有变体保持一致。
 | --- | --- | --- | --- |
 | `headless`（默认） | 测试、仅测试扩展、IDLE、Tk、`config-*/libpython*.a`、`config-*/python.o` | `ssl`、`sqlite3`、`ctypes` | 服务器和通用容器 |
 | `headed` | 测试、仅测试扩展、开发归档和对象 | `ssl`、`sqlite3`、`ctypes`、`tkinter` | 需要 Tk/IDLE 的工作站 |
-| `test` | 无 | `ssl`、`sqlite3`、`ctypes`、`test` | 兼容性测试和再分发分析 |
+| `test` | 无 | `ssl`、`sqlite3`、`ctypes`、`test` | 完整 CPython 对比和兼容性测试 |
 | `micro` | 安装器、文档、测试、头文件、开发文件、Tk、curses、dbm、readline | `ssl`、`sqlite3`、`ctypes`、`json`、`asyncio` | 仅标准库的 agent 沙盒 |
 | `nano` | `micro` 加 `__pycache__` | `ssl`、`sqlite3`、`ctypes`、`json`、`asyncio` | 最小仅标准库镜像；导入时从源码编译 |
 | `runtime` | `micro` 减去安装器，保留 `site-packages` | `ssl`、`sqlite3`、`ctypes`、`json`、`asyncio` | 带预装包的 agent 沙盒 |
@@ -242,8 +285,8 @@ HTTPS、SQLite、`ctypes`、压缩模块、时区和 `site-packages`。编辑
 `configs/distributions.toml` 可改变变体；默认发行变体是 `headless`。
 
 归档文件名会附加变体名，例如
-`snugpy-0.1.0-cpython3.14.9-linux-x86_64-baseline-headless.tar.xz`。包元数据为每个变体保留
-一条记录。报告矩阵使用默认发行变体，并分别列出每个变体的安装大小和归档大小。
+`snugpy-0.1.0-cpython3.14.9-linux-x86_64-static-lean-runtime-nano.tar.xz`。包元数据为每个
+变体保留一条记录。报告矩阵使用默认发行变体，并分别列出每个变体的安装大小和归档大小。
 
 ## 命令
 
@@ -258,7 +301,7 @@ HTTPS、SQLite、`ctypes`、压缩模块、时区和 `site-packages`。编辑
 | `make test-full PROFILE=size` | 运行完整 CPython 和 zerodep 检查 |
 | `make measure PROFILE=size RUNS=20` | 收集体积、启动、RSS 和工作负载数据 |
 | `make package PROFILE=size` | 为所有发行变体创建裁剪归档并冒烟测试 |
-| `make package PROFILE=size DISTRIBUTION=headless` | 创建并测试一个发行变体 |
+| `make package PROFILE=size DISTRIBUTION=runtime-nano` | 创建并测试一个发行变体 |
 | `make report` | 写入 `results/summary.csv` 和 `results/report.md` |
 | `make matrix` | 运行全部七个 profile，不因无关失败停止 |
 | `make images PROFILE=static-lean IMAGE_TAG=0.1.0` | 本地构建四个运行时镜像 |
@@ -268,30 +311,31 @@ HTTPS、SQLite、`ctypes`、压缩模块、时区和 `site-packages`。编辑
 直接脚本以位置参数接收 `VERSION`、`TARGET` 和 `PROFILE`。使用
 `python -m snugpy_build.cli list` 查看当前配置值。
 
-## 固定版本
+## 可移植性与限制
 
-- CPython `3.14.9`，标签 `v3.14.9`，提交
-  `ead82c07db1f111d613926ed1b6667411d768125`，SHA256
-  `e02d9ac21cebda6e46435369744a92c65cc7cd8669697694122cf97ffacd1e53`
-- zerodep `v2026.11.20`，提交
-  `9f872e8d652272c34600b9fda6448fe4fd4436c3`
-- 目标 `linux-x86_64`
-- conda 链接 profile 使用 conda-forge sysroot glibc `2.34`
-- `static-lean` 使用 Debian 12 系统库；测得 `GLIBC_2.35`，允许 `GLIBC_2.36`，
-  OpenSSL `3.0`
-- 工具链：Python `3.12`、GCC `16`、Clang `23`、`lld`、GNU binutils
+- CPython `3.14.9` 是唯一构建目标，由标签、提交和源码 SHA256 固定。
+- `linux-x86_64` 是唯一目标。macOS、Windows 和 `linux-aarch64` 尚未构建。
+- `static-lean` 是非 PIE 可执行文件。安全边界必须使用容器或 VM。
+- 发行归档不捆绑外部 C 库。运行时需提供文档列出的 soname，或使用镜像。
+- 运行时变体没有 pip、`ensurepip`、头文件或构建工具。
+- `runtime-nano` 首次导入标准库模块时编译。启动延迟比镜像体积更重要时使用 `runtime`。
 
-CI runner 是 Ubuntu 24.04，但 conda sysroot 是 2.34。`static-lean` 不使用该
-sysroot；它在 `debian:bookworm` 中构建并链接 Debian 系统库。任何可移植性或发布声明之前，
-都必须用 `scripts/check-abi.sh` 或 `objdump -T` 检查每个产物的实际符号需求。这些归档不是
-通用 Linux 发行版。
+conda-forge 的 `gdbm` 包缺少 ndbm 兼容库。conda 安装步骤从固定 GDBM `1.18` 源码构建
+`libgdbm_compat`，因此 `_dbm` 和 `_gdbm` 都可用。`tests/smoke.py` 验证一次 ndbm 往返。
 
 conda 链接 profile 的原生扩展链接 conda-forge 库，例如 OpenSSL、SQLite 和 `libffi`。
 `static-lean` 扩展改为链接 Debian soname。两种情况下，归档都不捆绑这些库。运行解压产物
 时要提供匹配的库集合，或在再分发前捆绑所需库。
 
-conda-forge 的 `gdbm` 包缺少 ndbm 兼容库。conda 安装步骤从固定 GDBM `1.18` 源码构建
-`libgdbm_compat`，因此 `_dbm` 和 `_gdbm` 都可用。`tests/smoke.py` 验证一次 ndbm 往返。
+任何可移植性或发布声明之前，都必须用 `scripts/check-abi.sh` 或 `objdump -T` 检查每个
+产物的实际符号需求。这些归档不是通用 Linux 发行版。
+
+## 版本策略
+
+SnugPy 工具链和 `zerodep` 的兼容下限是 Python 3.10。这**不**表示 SnugPy 必须构建或
+分发 CPython 3.10、3.11、3.12 和 3.13。CPython 每个次版本都有不同的 ABI。初始目标
+是一个固定的 CPython 3.14 维护版本。未来增加版本时，会为其单独固定源码、构建矩阵和发布
+决策；编译产物、安装前缀和配置不会跨版本共享。
 
 ## 目录结构
 

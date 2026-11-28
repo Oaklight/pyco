@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   PyPI. The installer does not modify an active conda environment.
 - English and Chinese READMEs. `README.md` is a symlink to `README_en.md`.
 
+### Changed
+
+- Reworked the README to lead with the compatibility-versus-size tradeoff and
+  compare SnugPy with full CPython, MicroPython, PocketPy, and Monty using
+  measured `linux-x86_64` artifacts.
+
 ## [0.1.0] - 2026-11-27
 
 ### Added
