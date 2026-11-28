@@ -9,7 +9,7 @@ RUN mv /opt/snugpy-* /opt/snugpy
 FROM ${BASE}
 
 ENV DEBIAN_FRONTEND=noninteractive
-ARG PACKAGES="libssl3 libsqlite3-0"
+ARG PACKAGES="libssl3 libsqlite3-0 netbase"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ${PACKAGES} \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*

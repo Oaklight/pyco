@@ -67,13 +67,13 @@ ldflags = "-Wl,--gc-sections -Wl,--build-id=none"
 experimental = true
 
 [profiles."static-lean"]
-description = "Static libpython with Clang -Oz, Debian system external libs, non-PIE link, LLD ICF, and no unwind tables"
+description = "Static libpython with Clang -Oz, Debian system external libs, non-PIE link, safe LLD ICF, and no unwind tables"
 cc = "clang"
 cxx = "clang++"
 configure = ["--disable-shared", "--with-ensurepip=install", "--without-doc-strings"]
 cflags = "--no-default-config --gcc-toolchain=/usr -Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fno-semantic-interposition"
 cppflags = ""
 cxxflags = "--no-default-config --gcc-toolchain=/usr -Oz -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-ident -fvisibility=hidden -fvisibility-inlines-hidden -fno-semantic-interposition"
-ldflags = "--no-default-config --gcc-toolchain=/usr -fuse-ld=lld -no-pie -Wl,--gc-sections -Wl,--icf=all -Wl,--build-id=none -Wl,--as-needed -Wl,--export-dynamic -Wl,-O2"
+ldflags = "--no-default-config --gcc-toolchain=/usr -fuse-ld=lld -no-pie -Wl,--gc-sections -Wl,--icf=safe -Wl,--build-id=none -Wl,--as-needed -Wl,--export-dynamic -Wl,-O2"
 external_libs = "system"
 experimental = true

@@ -121,7 +121,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            binutils ca-certificates curl file gcc git gzip libc6-dev make patch \
+            binutils ca-certificates curl file gcc git gzip libc6-dev make netbase patch \
             pkg-config xz-utils zlib1g-dev libbz2-dev libdb-dev libexpat1-dev \
             libffi-dev libgdbm-dev libgdbm-compat-dev liblzma-dev libncurses-dev \
             libreadline-dev libsqlite3-dev libssl-dev libzstd-dev tk-dev \

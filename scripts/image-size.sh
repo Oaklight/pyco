@@ -35,7 +35,7 @@ trap 'rm -rf "$work"' EXIT
 cp "$archive" "$work/runtime.tar.xz"
 
 tag="snugpy-image-${profile}-${distribution}-$(date +%s)-$$"
-packages=${IMAGE_PACKAGES:-libssl3 libsqlite3-0}
+packages=${IMAGE_PACKAGES:-libssl3 libsqlite3-0 netbase}
 dockerfile=${IMAGE_DOCKERFILE:-docker/runtime.Dockerfile}
 case "$dockerfile" in
 /*) ;;
@@ -51,7 +51,8 @@ docker build -q \
 
 bytes=$(docker image inspect "$tag" --format '{{.Size}}')
 docker run --rm --entrypoint python3.14 "$tag" -c \
-	"import asyncio, bz2, ctypes, hashlib, json, lzma, sqlite3, ssl, uuid, zlib, zoneinfo
+	"import asyncio, bz2, ctypes, hashlib, json, lzma, socket, sqlite3, ssl, uuid, zlib, zoneinfo
+assert socket.getservbyname('http', 'tcp') == 80
 connection = sqlite3.connect(':memory:')
 connection.execute('CREATE TABLE items (value INTEGER)')
 connection.execute('INSERT INTO items VALUES (1)')

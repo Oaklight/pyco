@@ -6,10 +6,12 @@ PROFILE ?= baseline
 DISTRIBUTION ?=
 RUNS ?= 10
 JOBS ?= $(shell nproc 2>/dev/null || echo 1)
+IMAGE_TAG ?=
+NAMESPACE ?= oaklight
 
 export PYTHONPATH := $(CURDIR)$(if $(PYTHONPATH),:$(PYTHONPATH))
 
-.PHONY: all help conda lock check fetch build test test-full measure package report matrix clean
+.PHONY: all help conda lock check fetch build test test-full measure package report matrix clean images publish-images
 
 all: check
 
@@ -26,6 +28,8 @@ help:
 	@echo "  package     - Create and verify distribution archives"
 	@echo "  report      - Write results/summary.csv and results/report.md"
 	@echo "  matrix      - Build, test, measure, and package all seven profiles"
+	@echo "  images      - Build the runtime images locally"
+	@echo "  publish-images - Build and push the runtime images to Docker Hub"
 	@echo "  clean       - Remove work/, out/, and dist/"
 	@echo ""
 	@echo "Variables:"
@@ -34,6 +38,7 @@ help:
 	@echo "  VERSION=$(VERSION)  TARGET=$(TARGET)  PROFILE=$(PROFILE)"
 	@echo "  DISTRIBUTION=$(DISTRIBUTION)  (empty packages headless, headed, and test)"
 	@echo "  RUNS=$(RUNS)  JOBS=$(JOBS)"
+	@echo "  IMAGE_TAG=$(IMAGE_TAG)  NAMESPACE=$(NAMESPACE)"
 
 conda:
 	./scripts/setup-conda.sh "$(CONDA_PREFIX)"
@@ -72,6 +77,15 @@ report:
 
 matrix:
 	./scripts/matrix.sh --version "$(VERSION)" --target "$(TARGET)" --runs "$(RUNS)"
+
+images:
+	./scripts/publish-images.sh "$(VERSION)" "$(PROFILE)" "$(TARGET)" \
+		--namespace "$(NAMESPACE)" $(if $(IMAGE_TAG),--tag "$(IMAGE_TAG)")
+
+publish-images:
+	./scripts/publish-images.sh "$(VERSION)" "$(PROFILE)" "$(TARGET)" \
+		--namespace "$(NAMESPACE)" $(if $(IMAGE_TAG),--tag "$(IMAGE_TAG)") \
+		--push --latest
 
 clean:
 	./scripts/clean.sh

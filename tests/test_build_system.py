@@ -100,13 +100,29 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("-fno-unwind-tables", static_lean.cflags)
         self.assertIn("-fvisibility=hidden", static_lean.cflags)
         self.assertIn("-no-pie", static_lean.ldflags)
-        self.assertIn("-Wl,--icf=all", static_lean.ldflags)
+        self.assertIn("-Wl,--icf=safe", static_lean.ldflags)
         self.assertEqual(static_lean.external_libs, "system")
 
-    def test_release_selection_is_not_approved(self) -> None:
+    def test_release_selection_approves_static_lean(self) -> None:
         selections = self.config.release_selection
-        self.assertTrue(selections)
-        self.assertFalse(any(selection.approved for selection in selections))
+        approved = [selection for selection in selections if selection.approved]
+        self.assertEqual(len(approved), 1)
+        selection = approved[0]
+        self.assertEqual(selection.version_key, "3.14")
+        self.assertEqual(selection.target, "linux-x86_64")
+        self.assertEqual(selection.profile, "static-lean")
+        self.assertEqual(selection.status, "approved")
+        for candidate in selections:
+            if candidate is not selection:
+                self.assertFalse(candidate.approved)
+
+    def test_installed_layout_uses_bundled_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            config = load_config(root)
+            self.assertEqual(config.root, root)
+            self.assertEqual(config.versions["3.14"].version, "3.14.9")
+            self.assertEqual(load_distributions(root).default, "headless")
 
 
 class DistributionTests(unittest.TestCase):

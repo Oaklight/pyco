@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .profiles import ProfileError, ProfileSpec, load_profiles, resolve_profile
+from .resources import config_dir
 from .util import SnugPyError
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -279,11 +280,23 @@ def _load_release_selection(path: Path) -> tuple[ReleaseSelection, ...]:
     return tuple(selections)
 
 
+def _workspace_root() -> Path:
+    """Return the working tree, or the current directory for installed use."""
+
+    package_root = Path(__file__).resolve().parents[1]
+    current = Path.cwd().resolve()
+    if (current / "configs" / "versions.toml").is_file():
+        return current
+    if (package_root / "configs" / "versions.toml").is_file():
+        return package_root
+    return current
+
+
 def load_config(root: Path | None = None) -> Config:
     """Load all configuration from configs/."""
 
-    repo_root = (root or Path(__file__).resolve().parents[1]).resolve()
-    configs = repo_root / "configs"
+    repo_root = (root or _workspace_root()).resolve()
+    configs = config_dir(repo_root)
     versions = _load_versions(configs / "versions.toml", repo_root)
     targets = _load_targets(configs / "targets.toml")
     profiles = load_profiles(configs / "profiles.toml")

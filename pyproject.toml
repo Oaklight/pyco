@@ -33,6 +33,15 @@ Issues = "https://github.com/Oaklight/snugpy/issues"
 [tool.setuptools]
 packages = ["snugpy_build"]
 
+[tool.setuptools.data-files]
+"share/snugpy/configs" = [
+  "configs/distributions.toml",
+  "configs/profiles.toml",
+  "configs/release-selection.toml",
+  "configs/targets.toml",
+  "configs/versions.toml",
+]
+
 [tool.setuptools.dynamic]
 version = { attr = "snugpy_build.__version__" }
 

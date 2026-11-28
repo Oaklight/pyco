@@ -11,6 +11,7 @@ try:
 except ModuleNotFoundError:  # Python 3.10
     import tomli as tomllib
 
+from .resources import config_dir
 from .util import SnugPyError
 
 DEFAULT_DISTRIBUTION = "headless"
@@ -74,6 +75,8 @@ def load_distributions(root: Path) -> DistributionSet:
     """Load distribution variants from configs/distributions.toml."""
 
     path = root / "configs" / "distributions.toml"
+    if not path.is_file():
+        path = config_dir(root) / "distributions.toml"
     with path.open("rb") as handle:
         data = tomllib.load(handle)
     if data.get("schema_version") != 1:

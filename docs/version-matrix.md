@@ -6,7 +6,9 @@ version is a separate build matrix, not a configuration switch.
 
 Snapshot source:
 
-- Profile and image metrics: CI run `45948508874` on `main`, commit `39329e3`
+- Other profile metrics: CI run `45948508874` on `main`, commit `39329e3`
+- `static-lean` metrics, image sizes, and release gate: benchmark run
+  `46067091932`, commit `9e6fc6b`
 - CPython `3.14.9`
 - Target `linux-x86_64`
 - Profiles: seven
@@ -20,7 +22,7 @@ Snapshot source:
 | 3.11 | No pin | Not built |
 | 3.12 | Toolchain interpreter only | Not built |
 | 3.13 | No pin | Not built |
-| 3.14.9 | Pinned build target | Built, smoke-tested, not release-eligible |
+| 3.14.9 | Pinned build target | Built, fully tested, release-eligible with `static-lean` |
 
 The 3.10 floor is a tooling requirement. It does not imply a 3.10
 distribution. Each built CPython minor version gets its own pinned source
@@ -52,16 +54,17 @@ warm-cache `python -c pass` time. RSS is the peak for the same command.
 | `static` | 5,009,472 | -21.53% | 69,850,724 | 11,743,108 | 9.944 ms | 8,860 KiB |
 | `clang-oz` | 5,025,184 | -21.29% | 69,796,546 | 11,757,624 | 10.398 ms | 8,736 KiB |
 | `lean` | 4,223,984 | -33.84% | 68,408,095 | 11,453,428 | 10.325 ms | 8,344 KiB |
-| `static-lean` | 3,673,432 | -42.46% | 67,457,096 | 11,385,808 | 9.385 ms | 7,608 KiB |
+| `static-lean` | 3,686,520 | -42.25% | 69,146,001 | 11,396,640 | 13.873 ms | 7,516 KiB |
 
 `static-lean` is the smallest profile. It is also the only profile linked
 against Debian 12 system libraries instead of the conda-forge toolchain
 libraries. It is a non-PIE executable, so container or VM isolation must be the
 security boundary.
 
-No profile is release-eligible yet. CI runs smoke tests and the ABI gate, but
-the full CPython regression suite and `zerodep` tests are skipped. `eligible` is
-`false` for every row in the report until those gates run.
+`static-lean` is release-eligible for 0.1.0. Benchmark run `46067091932` passed
+the full CPython regression suite and the `zerodep` tests with network access
+(`eligible: true`, no failures or skips). The other six profiles still run
+smoke tests only and remain experimental.
 
 Startup medians vary by several milliseconds between CI runs. Treat them as
 order-of-magnitude indicators, not a stable ranking. Core, installed, and
@@ -80,7 +83,7 @@ seven variants from the same stripped installation tree.
 | `static` | 75.2 / 12.2 | 66.6 / 11.2 | 47.5 / 6.6 | 18.6 / 3.9 | 47.5 / 6.6 | 18.6 / 3.9 | 241.0 / 26.2 |
 | `clang-oz` | 75.1 / 12.2 | 66.6 / 11.2 | 47.4 / 6.6 | 18.6 / 3.9 | 47.4 / 6.6 | 18.6 / 3.9 | 233.1 / 26.3 |
 | `lean` | 73.8 / 11.9 | 65.2 / 10.9 | 46.2 / 6.3 | 17.3 / 3.6 | 46.2 / 6.3 | 17.3 / 3.6 | 232.8 / 26.0 |
-| `static-lean` | 72.9 / 11.9 | 64.3 / 10.9 | 45.3 / 6.3 | 16.4 / 3.6 | 45.3 / 6.3 | 16.4 / 3.5 | 240.6 / 26.0 |
+| `static-lean` | 74.5 / 11.9 | 65.9 / 10.9 | 46.7 / 6.3 | 16.4 / 3.5 | 46.7 / 6.3 | 16.4 / 3.6 | 242.3 / 26.0 |
 
 The `lto` `test` archive at 64.2 MiB is an outlier. Every other `test` archive
 is close to 26 MiB. Investigate before using that cell as a baseline.
@@ -89,13 +92,13 @@ is close to 26 MiB. Investigate before using that cell as a baseline.
 
 | Distribution | Installed bytes | Archive bytes | Smoke imports |
 | --- | ---: | ---: | --- |
-| `headed` | 76,423,838 | 12,446,132 | `ssl`, `sqlite3`, `ctypes`, `tkinter` |
-| `headless` | 67,457,096 | 11,385,808 | `ssl`, `sqlite3`, `ctypes` |
-| `micro` | 47,474,820 | 6,557,056 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
-| `nano` | 17,228,968 | 3,723,184 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
-| `runtime` | 47,474,939 | 6,559,728 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
-| `runtime-nano` | 17,229,087 | 3,721,880 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
-| `test` | 252,292,201 | 27,271,496 | `ssl`, `sqlite3`, `ctypes`, `test` |
+| `headed` | 78,112,743 | 12,450,960 | `ssl`, `sqlite3`, `ctypes`, `tkinter` |
+| `headless` | 69,146,001 | 11,396,640 | `ssl`, `sqlite3`, `ctypes` |
+| `micro` | 49,003,849 | 6,568,892 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `nano` | 17,244,968 | 3,722,400 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `runtime` | 49,003,968 | 6,563,328 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `runtime-nano` | 17,245,087 | 3,724,212 | `ssl`, `sqlite3`, `ctypes`, `json`, `asyncio` |
+| `test` | 254,108,716 | 27,283,788 | `ssl`, `sqlite3`, `ctypes`, `test` |
 
 `runtime` is the agent-sandbox target. It keeps `site-packages` so
 `numpy`/`pandas` installed at image-build time survive, and removes `pip`,
@@ -103,27 +106,27 @@ is close to 26 MiB. Investigate before using that cell as a baseline.
 
 `runtime-nano` is the compact agent-sandbox target. It keeps `site-packages`,
 but removes `__pycache__` from both the standard library and installed packages.
-Imports compile on first use. Its installed tree is 30,245,852 bytes smaller
+Imports compile on first use. Its installed tree is 31,758,881 bytes smaller
 than `runtime`. `nano` remains the smallest stdlib-only variant; its installed
 tree is 119 bytes smaller than `runtime-nano`.
 
 ## Runtime image footprint
 
 Measurements use `static-lean` on `linux-x86_64`. The three `runtime` images
-contain 47,474,939 installed bytes. The scratch `runtime-nano` image contains
-17,229,087 installed bytes.
+contain 49,003,968 installed bytes. The scratch `runtime-nano` image contains
+17,245,087 installed bytes.
 
 | Image | Distribution | Final bytes | MiB | Shell | Package manager |
 | --- | --- | ---: | ---: | --- | --- |
-| Debian slim | `runtime` | 129,918,089 | 123.90 | yes | apt |
-| Distroless | `runtime` | 73,808,996 | 70.39 | no | no |
-| Scratch | `runtime` | 63,730,573 | 60.78 | no | no |
-| Scratch | `runtime-nano` | 33,484,721 | 31.93 | no | no |
+| Debian slim | `runtime` | 131,471,769 | 125.38 | yes | apt |
+| Distroless | `runtime` | 75,338,025 | 71.85 | no | no |
+| Scratch | `runtime` | 65,259,602 | 62.24 | no | no |
+| Scratch | `runtime-nano` | 33,500,721 | 31.95 | no | no |
 
 Scratch `runtime` is 10,078,423 bytes smaller than distroless `runtime`, a
-13.7% reduction. Scratch `runtime-nano` is 40,324,275 bytes smaller than
-distroless `runtime`, a 54.6% reduction. It is 96,433,368 bytes smaller than
-the Debian slim `runtime` image, a 74.2% reduction.
+13.4% reduction. Scratch `runtime-nano` is 41,837,304 bytes smaller than
+distroless `runtime`, a 55.5% reduction. It is 97,971,048 bytes smaller than
+the Debian slim `runtime` image, a 74.5% reduction.
 
 ### Scratch root filesystem
 
